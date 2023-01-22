@@ -22,11 +22,13 @@ def get_youtube_video_info(youtube_video_url):
         video_id = info.get('id')
         video_url = info.get('url')
     return {
+        'status': 'ok',
         'title': title,
         'duration': duration,
         'video_id': video_id,
         'video_url': video_url
     }
+
 
 
 
