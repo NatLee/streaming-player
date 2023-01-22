@@ -40,6 +40,8 @@ urlpatterns += [
     path(f"{URL_PREFIX}/auth/google/", include("custom_auth.urls")),
     # ping
     path("ping", include("ping.urls"), name="ping"),
+    # player
+    path("player/", include("player.urls"), name="player"),
 ]
 
 

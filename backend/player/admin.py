@@ -7,6 +7,7 @@ from simple_history.admin import SimpleHistoryAdmin
 from player.models import (
     Playlist,
     PlaylistOrderHistory,
+    PlaylistOrderQueue
 )
 
 def get_last_week():
@@ -38,6 +39,7 @@ class PlaylistOrderHistoryAdmin(admin.ModelAdmin):
         "playlist",
         "user",
         "played",
+        "cut",
         "created_at",
     )
     list_filter = (
@@ -47,6 +49,24 @@ class PlaylistOrderHistoryAdmin(admin.ModelAdmin):
 
     def get_rangefilter_created_at_default(self, request):
         return (get_last_week, datetime.date.today)
+
+
+@admin.register(PlaylistOrderQueue)
+class PlaylistOrderQueueHistoryAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "order",
+        "playlist_order",
+        "created_at",
+    )
+    list_filter = (
+        ('created_at', DateRangeFilter),
+    )
+    search_fields = ["playlist_order__playlist__song_name", "playlist_order__playlist__url", "playlist_order__user"]
+
+    def get_rangefilter_created_at_default(self, request):
+        return (get_last_week, datetime.date.today)
+
 
 
 

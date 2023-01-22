@@ -16,6 +16,8 @@ pip install -r requirements.txt
 .\dev-start.bat
 ```
 
+See `http://localhost/player/`
+
 ## Link
 
 - [Admin](http://localhost/api/__hidden_admin)

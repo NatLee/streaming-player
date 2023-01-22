@@ -1,0 +1,168 @@
+<html>
+  <head>
+    <link rel="shortcut icon" href="#" />
+    <link href="https://vjs.zencdn.net/7.11.4/video-js.css" rel="stylesheet" />
+  </head>
+
+  <body>
+    <video-js
+      id="video"
+      class="video-js"
+      controls
+      preload="auto"
+      width="640"
+      height="390"
+      autoplay="true"
+      data-setup="{}"
+    ></video-js>
+
+    <br /><br />
+
+    <div id="title"></div>
+    <div id="url"></div>
+    <div id="duration"></div>
+    <div id="user"></div>
+
+    <br /><br />
+
+    <button onclick="play()">Play</button>
+    <button onclick="pause()">Pause</button>
+    <button onclick="mute()">Mute</button>
+    <button onclick="cut()">Cut</button>
+
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+
+    <script src="https://vjs.zencdn.net/7.11.4/video.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.2/socket.io.min.js"></script>
+
+    <script>
+      var now_playing_id = 0;
+
+      function cut_song_signal() {
+        if (now_playing_id != 0) {
+          console.log(`沒播完，直接卡掉，移除佇列ID：` + now_playing_id);
+          $.ajax({
+            type: "GET",
+            dataType: "json",
+            url: "playlist/" + now_playing_id + "/mark?cut=true",
+            success: function (res) {
+              console.log(res);
+              now_playing_id = 0;
+            },
+          });
+        }
+      }
+
+      function play() {
+        var videoPlayer = videojs("video");
+        videoPlayer.play();
+      }
+      function pause() {
+        var videoPlayer = videojs("video");
+        videoPlayer.pause();
+      }
+      function mute() {
+        var videoPlayer = videojs("video");
+        videoPlayer.muted(true);
+      }
+      function cut() {
+        cut_song_signal();
+        location.reload();
+      }
+
+      function set_playlist(videoPlayer) {
+        $.ajax({
+          type: "GET",
+          dataType: "json",
+          url: "playlist/get",
+          success: function (playlist) {
+            new_id = playlist[0].id;
+            user = playlist[0].user;
+            in_queue = playlist[0].in_queue;
+            url = playlist[0].url;
+            console.log(`------------------------------------`);
+            console.log(`點播者： ` + user);
+            console.log(`此ID是否於佇列中： ` + in_queue);
+            console.log(`播放ID轉換： ` + now_playing_id + ` -> ` + new_id);
+            console.log(`------------------------------------`);
+            $.ajax({
+              type: "GET",
+              url: "youtube-video-info?url=" + url,
+              success: function (res) {
+                now_playing_id = new_id;
+                videoPlayer.src({
+                  type: "video/mp4",
+                  src: res.video_url,
+                });
+                mute();
+                $("#user").text(user);
+                $("#title").text(res.title);
+                $("#url").text(res.url);
+                $("#duration").text(res.duration);
+                console.log("Get new video");
+                console.log(res);
+              },
+              error: function (err) {
+                console.log(err);
+              },
+            });
+          },
+          error: function (err) {
+            console.log(err);
+          },
+        });
+      }
+
+      function check_and_set_playlist(videoPlayer) {
+        if (now_playing_id != 0) {
+          console.log(`播放完畢，移除佇列ID：` + now_playing_id);
+          $.ajax({
+            type: "GET",
+            dataType: "json",
+            url: "playlist/" + now_playing_id + "/mark?played=true",
+            success: function (res) {
+              console.log(res);
+              set_playlist(videoPlayer);
+            },
+          });
+        } else {
+          set_playlist(videoPlayer);
+        }
+      }
+
+      function set_and_play() {
+        var videoPlayer = videojs("video");
+        videoPlayer.reloadSourceOnError({
+          getSource: function (reload) {
+            console.log("Reloading because of an error");
+            check_and_set_playlist(videoPlayer);
+          },
+          errorInterval: 5,
+        });
+        check_and_set_playlist(videoPlayer);
+      }
+
+      function change_player_src() {
+        var videoPlayer = videojs("video").ready(function () {
+          var player = this;
+          player.on("ended", function () {
+            set_and_play();
+          });
+          set_and_play();
+        });
+      }
+
+      function init_player() {
+        $.when(
+          $.ajax("playlist/get").then((res) => {
+            change_player_src();
+          })
+        );
+      }
+
+      $(document).ready(function () {
+        init_player();
+      });
+    </script>
+  </body>
+</html>
