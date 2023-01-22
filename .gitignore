@@ -6,6 +6,7 @@ backend-sql-data/
 .DS_Store
 desktop.ini
 *_initial.py
+doc
 
 
 # Byte-compiled / optimized / DLL files
