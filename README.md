@@ -16,18 +16,18 @@ pip install -r requirements.txt
 .\dev-start.bat
 ```
 
-See `http://localhost/player/`
+See `http://localhost:8000/player/`
 
 ## Link
 
-- [Admin](http://localhost/api/__hidden_admin)
+- [Admin](http://localhost:8000/api/__hidden_admin)
 
-- [Redoc](http://localhost/api/__hidden_redoc)
+- [Redoc](http://localhost:8000/api/__hidden_redoc)
 
-- [Swagger](http://localhost/api/__hidden_swagger)
+- [Swagger](http://localhost:8000/api/__hidden_swagger)
 
-- [Session Login with Rest Framework](http://localhost/api/__hidden_dev_dashboard/login)
+- [Session Login with Rest Framework](http://localhost:8000/api/__hidden_dev_dashboard/login)
 
-- [JWT Login](http://localhost/api/__hidden_dev_dashboard/login)
+- [JWT Login](http://localhost:8000/api/__hidden_dev_dashboard/login)
 
-- [DEV dashboard](http://localhost/api/__hidden_dev_dashboard/dashboard)
+- [DEV dashboard](http://localhost:8000/api/__hidden_dev_dashboard/dashboard)
