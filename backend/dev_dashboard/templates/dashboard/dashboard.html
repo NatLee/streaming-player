@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Dev Dashboard{% endblock %}
+{% load static %}
+{% block content %}
+    <div class="jumbotron">
+        <h1>Dev Dashboard</h1>
+        <p>Welcome to your dashboard.</p>
+    </div>
+
+    <h2>Google Client ID</h2>
+    <div class="container">
+        {{ social_google_client_id }}
+    </div>
+
+    <h2>JWT Field</h2>
+    <h3>---------------------------</h3>
+    <div class="container">
+        <h3 id="token"></h3>
+        <h3 id="result"></h3>
+    </div>
+
+    <h2>Session Field</h2>
+    <h3>---------------------------</h3>
+
+    {% if request.user.is_authenticated %}
+    <div class="container">
+        <h3 class="text-primary">You are login as `{{ request.user }}` with this session!</h3>
+    </div>
+    {% else %}
+    <div class="container">
+        <h3 class="text-danger">No any session login.</h3>
+    </div>
+    {% endif %}
+
+
+
+<script src="{% static 'js/dashboard.js' %}"></script>
+<script src="{% static 'js/logout.js' %}"></script>
+
+{% endblock %}
