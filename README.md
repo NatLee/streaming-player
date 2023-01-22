@@ -2,6 +2,13 @@
 
 This is a player can be used on streaming.
 
+## Playlist
+![playlist](https://user-images.githubusercontent.com/10178964/213933850-a9dfa041-7d69-4600-8e18-b8b71f026157.png)
+
+### History
+![playlist-history](https://user-images.githubusercontent.com/10178964/213933824-d1545650-901a-4934-a0ea-3cde8ae7b311.png)
+
+
 ## Requirements
 
 ```bash
