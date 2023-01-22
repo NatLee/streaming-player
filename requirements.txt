@@ -1,0 +1,21 @@
+Django==4.1.5
+
+django-cors-headers==3.11.0
+django-bootstrap3==21.2
+djangorestframework==3.13.1
+djangorestframework-simplejwt==4.8.0
+django-redis
+django-simple-history
+django-author
+djoser
+
+django-simpleui
+
+drf-yasg==1.21.4
+
+pyparsing==3.0.8
+
+loguru
+google-auth
+
+ipython # for debugging
