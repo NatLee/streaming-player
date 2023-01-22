@@ -9,11 +9,12 @@ class Playlist(models.Model):
     url = models.CharField("URL", max_length=512)
     created_at = models.DateTimeField("新增時間", auto_now_add=True)
     last_played_at = models.DateTimeField("最後播放時間", auto_now=True)
+    duration = models.IntegerField("播放秒數", default=0)
 
     history = HistoricalRecords(table_name="playlist_history")
 
     def __str__(self):
-        return self.song_name
+        return f'{self.song_name} - {self.duration//60} min(s)'
 
     def get_absolute_url(self):
         """Returns the url to access a detail record for this model."""

@@ -18,6 +18,7 @@ class PlaylistAdmin(SimpleHistoryAdmin):
         "id",
         "song_name",
         "url",
+        "duration",
         "last_played_at",
         "created_at",
     )
