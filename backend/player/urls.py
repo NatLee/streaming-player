@@ -27,4 +27,9 @@ urlpatterns = [
         views.mark.as_view(),
         name="mark",
     ),
+    path(
+        "playlist/queue",
+        views.order_queue.as_view(),
+        name="order_queue",
+    ),
 ]

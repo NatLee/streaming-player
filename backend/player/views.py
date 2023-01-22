@@ -200,6 +200,48 @@ class get(APIView):
             [result]
         )
 
+class order_queue(APIView):
+    permission_classes = (AllowAny,)
+
+    @swagger_auto_schema(
+        operation_summary="GET",
+        operation_description="拿到整個佇列的歌曲列表",
+        responses={
+            "200": openapi.Response(
+                description="message",
+                examples={
+                    "application/json": {
+                        "result": [],
+                        "code": 0,
+                    }
+                },
+            )
+        },
+    )
+    def get(self, request):
+
+        results = []
+
+        for pk, song_name, url, user, order in PlaylistOrderQueue.objects.all().order_by('order').values_list(
+            'id',
+            'playlist_order__playlist__song_name',
+            'playlist_order__playlist__url',
+            'playlist_order__user',
+            'order'
+        ):
+            results.append({
+                'id': pk,
+                'song_name': song_name,
+                'url': url,
+                'user': user,
+                'order': order
+            })
+
+        return Response(results)
+
+
+
+
 
 class mark(APIView):
     permission_classes = (AllowAny,)
