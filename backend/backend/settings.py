@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "bootstrap3",
     "djoser",
     "corsheaders",
+    "rangefilter",
     "simple_history",
     "author",
     # custom

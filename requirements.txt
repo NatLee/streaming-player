@@ -9,6 +9,8 @@ django-simple-history
 django-author
 djoser
 
+django-admin-rangefilter
+
 django-simpleui
 
 drf-yasg==1.21.4
