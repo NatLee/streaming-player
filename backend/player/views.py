@@ -123,12 +123,13 @@ class order(APIView):
 
         song_name = result.get("title")
         duration = result.get("duration")
+        webpage_url = result.get("webpage_url")
 
         if duration > 900:
             return Response("這歌怎麼能超過15分鐘！")
 
         song, created = Playlist.objects.update_or_create(
-            song_name=song_name, url=url, duration=duration
+            song_name=song_name, url=webpage_url, duration=duration
         )
 
         # 被ban的歌就不給點
@@ -136,7 +137,9 @@ class order(APIView):
             return Response("Sorry! This song has been blocked ;/")
 
         # 有人點過就不再存到佇列
-        queue = PlaylistOrderQueue.objects.filter(playlist_order__playlist__url=url)
+        queue = PlaylistOrderQueue.objects.filter(
+            playlist_order__playlist__url=webpage_url
+        )
         if queue:
             element = queue.first()
             return Response(
