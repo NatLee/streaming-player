@@ -13,7 +13,7 @@ urlpatterns = [
         name="youtube-video-info",
     ),
     path(
-        "order",
+        "nightbot/order",
         views.order.as_view(),
         name="order",
     ),

@@ -160,7 +160,6 @@ class order(APIView):
 
         return Response(f'{user} 無情點播了『{song.song_name}』！')
 
-
 class get(APIView):
     permission_classes = (AllowAny,)
 
@@ -246,10 +245,6 @@ class order_queue(APIView):
             })
 
         return Response(results)
-
-
-
-
 
 class mark(APIView):
     permission_classes = (AllowAny,)
@@ -340,5 +335,4 @@ class mark(APIView):
             'status': 'ok',
             'description': f'佇列中ID爲[{get_id}]的原點歌狀態已改變並已從佇列中移除'
         })
-
 
