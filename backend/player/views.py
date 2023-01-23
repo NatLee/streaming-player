@@ -109,8 +109,11 @@ class order(APIView):
         user = request.query_params.get("user", None)
         url = request.query_params.get("url", None)
 
-        if not url or not user:
-            return Response(f"記得要填使用者跟URL！ -> [{user}][{url}]")
+        if not url:
+            return Response(f"哪有人點歌不輸入網址的！ -> [{url}]")
+
+        if not user:
+            return Response(f"記得要填使用者！ -> [{user}]")
 
         now_order = PlaylistOrderQueue.objects.count()
         
@@ -133,6 +136,10 @@ class order(APIView):
             url=url,
             duration=duration
         )
+
+        # 被ban的歌就不給點
+        if song.block:
+            return Response("Sorry! This song has been blocked ;/")
 
         # 有人點過就不再存到佇列
         queue = PlaylistOrderQueue.objects.filter(playlist_order__playlist__url=url)
@@ -181,7 +188,8 @@ class get(APIView):
         else:
             print('佇列中沒有任何歌曲，故從已知歌曲列表隨機播放')
             try:
-                rng_song = random.choice(Playlist.objects.all())
+                # 這邊要選取favorite爲True的
+                rng_song = random.choice(Playlist.objects.all().filter(favorite=True))
                 poh = PlaylistOrderHistory.objects.create(
                     playlist=rng_song,
                     user='nightbot'
