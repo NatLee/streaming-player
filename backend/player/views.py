@@ -22,6 +22,7 @@ def dashboard(request):
     # template path
     return render(request, "index.html")
 
+
 class youtube_video_info(APIView):
     permission_classes = (AllowAny,)
 
@@ -54,20 +55,15 @@ class youtube_video_info(APIView):
         url = request.query_params.get("url", None)
 
         if not url:
-            return Response({
-                "status": "failed",
-                "description": f"記得要填URL！ -> [{url}]"
-            })
+            return Response({"status": "failed", "description": f"記得要填URL！ -> [{url}]"})
 
         try:
             result = get_youtube_video_info(url)
         except Exception as e:
-            return {
-                'status': 'failed',
-                'description': '獲取Youtube Video URL失敗'
-            }
+            return {"status": "failed", "description": "獲取Youtube Video URL失敗"}
 
         return Response(result)
+
 
 class order(APIView):
     permission_classes = (AllowAny,)
@@ -116,25 +112,23 @@ class order(APIView):
             return Response(f"記得要填使用者！ -> [{user}]")
 
         now_order = PlaylistOrderQueue.objects.count()
-        
-        if now_order >=30:
+
+        if now_order >= 30:
             return Response("要播的歌太多了！再點我要罷工了！")
 
         try:
             result = get_youtube_video_info(url)
         except Exception as e:
-            return Response('獲取Youtube Video URL失敗')
+            return Response("獲取Youtube Video URL失敗")
 
-        song_name = result.get('title')
-        duration = result.get('duration')
+        song_name = result.get("title")
+        duration = result.get("duration")
 
         if duration > 900:
-            return Response('這歌怎麼能超過15分鐘！')
+            return Response("這歌怎麼能超過15分鐘！")
 
         song, created = Playlist.objects.update_or_create(
-            song_name=song_name,
-            url=url,
-            duration=duration
+            song_name=song_name, url=url, duration=duration
         )
 
         # 被ban的歌就不給點
@@ -145,20 +139,24 @@ class order(APIView):
         queue = PlaylistOrderQueue.objects.filter(playlist_order__playlist__url=url)
         if queue:
             element = queue.first()
-            return Response(f'這首歌被 {element.playlist_order.user} 點過，在佇列還沒播放！目前順位 {element.order}！')
+            return Response(
+                f"這首歌被 {element.playlist_order.user} 點過，在佇列還沒播放！目前順位 {element.order}！"
+            )
 
         # 佇列內沒人點過就存放到歷史記錄
-        poh = PlaylistOrderHistory.objects.create(
-            playlist=song,
-            user=user
-        )
+        poh = PlaylistOrderHistory.objects.create(playlist=song, user=user)
 
-        PlaylistOrderQueue.objects.create(
-            playlist_order=poh,
-            order=now_order+1
-        )
+        # 這邊要重新排序，怕中間有被刪除的歌
+        count = 0
+        for idx, obj in enumerate(PlaylistOrderQueue.objects.order_by("order").all()):
+            obj.order = idx + 1
+            obj.save()
+            count += 1
 
-        return Response(f'{user} 無情點播了『{song.song_name}』！')
+        PlaylistOrderQueue.objects.create(playlist_order=poh, order=count + 1)
+
+        return Response(f"{user} 無情點播了『{song.song_name}』！")
+
 
 class get(APIView):
     permission_classes = (AllowAny,)
@@ -180,32 +178,30 @@ class get(APIView):
     )
     def get(self, request):
 
-        result = PlaylistOrderQueue.objects.order_by('order')
+        result = PlaylistOrderQueue.objects.order_by("order")
         if result:
             result = result.first().to_dict()
-            result['in_queue'] = True
+            result["in_queue"] = True
         else:
-            print('佇列中沒有任何歌曲，故從已知歌曲列表隨機播放')
+            print("佇列中沒有任何歌曲，故從已知歌曲列表隨機播放")
             try:
                 # 這邊要選取favorite爲True的
                 rng_song = random.choice(Playlist.objects.all().filter(favorite=True))
                 poh = PlaylistOrderHistory.objects.create(
-                    playlist=rng_song,
-                    user='nightbot'
+                    playlist=rng_song, user="nightbot"
                 )
+                # 佇列中沒有任何歌曲，但還是把order設定爲總數+1，也就是0+1
                 now_order = PlaylistOrderQueue.objects.count()
                 result = PlaylistOrderQueue.objects.create(
-                    playlist_order=poh,
-                    order=now_order+1
+                    playlist_order=poh, order=now_order + 1
                 )
                 result = result.to_dict()
-                result['in_queue'] = False
+                result["in_queue"] = False
             except:
                 # 找不到任何歌曲
                 return Response([])
-        return Response(
-            [result]
-        )
+        return Response([result])
+
 
 class order_queue(APIView):
     permission_classes = (AllowAny,)
@@ -229,22 +225,29 @@ class order_queue(APIView):
 
         results = []
 
-        for pk, song_name, url, user, order in PlaylistOrderQueue.objects.all().order_by('order').values_list(
-            'id',
-            'playlist_order__playlist__song_name',
-            'playlist_order__playlist__url',
-            'playlist_order__user',
-            'order'
+        for pk, song_name, url, user, order in (
+            PlaylistOrderQueue.objects.all()
+            .order_by("order")
+            .values_list(
+                "id",
+                "playlist_order__playlist__song_name",
+                "playlist_order__playlist__url",
+                "playlist_order__user",
+                "order",
+            )
         ):
-            results.append({
-                'id': pk,
-                'song_name': song_name,
-                'url': url,
-                'user': user,
-                'order': order
-            })
+            results.append(
+                {
+                    "id": pk,
+                    "song_name": song_name,
+                    "url": url,
+                    "user": user,
+                    "order": order,
+                }
+            )
 
         return Response(results)
+
 
 class mark(APIView):
     permission_classes = (AllowAny,)
@@ -286,15 +289,12 @@ class mark(APIView):
 
         queryset = PlaylistOrderQueue.objects.filter(pk=get_id)
         if not queryset:
-            return Response({
-                "status": "failed",
-                "description": "這個ID已經不存在於佇列中"
-            })
+            return Response({"status": "failed", "description": "這個ID已經不存在於佇列中"})
         result = queryset.first()
 
         tf_map = {
-            'true': True,
-            'false': False,
+            "true": True,
+            "false": False,
         }
 
         in_coming_played = request.GET.get("played")
@@ -313,26 +313,30 @@ class mark(APIView):
         if in_coming_cut is None:
             in_coming_cut = old_cut
 
-        if not isinstance(in_coming_played, bool) or not isinstance(in_coming_cut, bool):
-            return Response({
-                "status": "failed",
-                "description": f'`played` or `cut` need to be boolean -> [{in_coming_played}][{in_coming_cut}]'
-            })
+        if not isinstance(in_coming_played, bool) or not isinstance(
+            in_coming_cut, bool
+        ):
+            return Response(
+                {
+                    "status": "failed",
+                    "description": f"`played` or `cut` need to be boolean -> [{in_coming_played}][{in_coming_cut}]",
+                }
+            )
 
         result.playlist_order.played = in_coming_played
         result.playlist_order.cut = in_coming_cut
         result.playlist_order.save()
         result.delete()
 
-        print('------------------------------------------')
-        print(f'[{get_id}] {result.playlist_order.user} 點的『{result.playlist_order.playlist.song_name}』狀態改變')
-        print(f'Play: {old_played} -> {in_coming_played}')
-        print(f'Cut: {old_cut} -> {in_coming_cut}')
-        print(f'Remove [{get_id}] from queue!')
-        print('------------------------------------------')
+        print("------------------------------------------")
+        print(
+            f"[{get_id}] {result.playlist_order.user} 點的『{result.playlist_order.playlist.song_name}』狀態改變"
+        )
+        print(f"Play: {old_played} -> {in_coming_played}")
+        print(f"Cut: {old_cut} -> {in_coming_cut}")
+        print(f"Remove [{get_id}] from queue!")
+        print("------------------------------------------")
 
-        return Response({
-            'status': 'ok',
-            'description': f'佇列中ID爲[{get_id}]的原點歌狀態已改變並已從佇列中移除'
-        })
-
+        return Response(
+            {"status": "ok", "description": f"佇列中ID爲[{get_id}]的原點歌狀態已改變並已從佇列中移除"}
+        )
