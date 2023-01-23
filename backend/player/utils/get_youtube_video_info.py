@@ -3,7 +3,7 @@ from youtube_dl import YoutubeDL
 
 YDL_OPTIONS = {
     "quiet": True,
-    "format": "bestaudio",
+    "format": "best",
     "noplaylist": True,
     "skip_download": True,
 }
