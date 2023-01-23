@@ -36,12 +36,12 @@ class GoogleLogin(MyTokenObtainPairView):
                 return Response(get_tokens_for_user(user))
             except InvalidEmailError:
                 return Response(
-                    {"status": "error", "detail": "This email is invaild."}, status=401
+                    {"status": "error", "detail": "This email is invalid."}, status=401
                 )
             except ValueError as e:
                 logger.error(e)
                 return Response(
-                    {"status": "error", "detail": "Something wnet wrong :("}, status=500
+                    {"status": "error", "detail": "Something went wrong :(", "description": e}, status=500
                 )
         else:
             return Response(
