@@ -36,6 +36,7 @@
     <button onclick="play()">Play</button>
     <button onclick="pause()">Pause</button>
     <button onclick="mute()">Mute</button>
+    <button onclick="unmute()">Unmute</button>
     <button onclick="cut()">Cut</button>
 
     <br /><br />
@@ -196,6 +197,9 @@
       }
 
       function change_player_src() {
+        // 更新底下播放清單
+        load_song_list();
+
         var videoPlayer = videojs("video").ready(function () {
           var player = this;
           // 設定播放器音量
@@ -224,7 +228,6 @@
       }
 
       $(document).ready(function () {
-        load_song_list();
         change_player_src();
       });
     </script>

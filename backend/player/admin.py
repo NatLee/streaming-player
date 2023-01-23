@@ -4,14 +4,12 @@ from rangefilter.filters import DateRangeFilter, DateTimeRangeFilter, NumericRan
 
 from simple_history.admin import SimpleHistoryAdmin
 
-from player.models import (
-    Playlist,
-    PlaylistOrderHistory,
-    PlaylistOrderQueue
-)
+from player.models import Playlist, PlaylistOrderHistory, PlaylistOrderQueue
+
 
 def get_last_week():
-    return datetime.date.today()-datetime.timedelta(days=7)
+    return datetime.date.today() - datetime.timedelta(days=7)
+
 
 @admin.register(Playlist)
 class PlaylistAdmin(SimpleHistoryAdmin):
@@ -28,7 +26,7 @@ class PlaylistAdmin(SimpleHistoryAdmin):
     list_filter = (
         "favorite",
         "block",
-        ('created_at', DateRangeFilter),
+        ("created_at", DateRangeFilter),
     )
     search_fields = ["song_name", "url"]
 
@@ -44,12 +42,13 @@ class PlaylistOrderHistoryAdmin(admin.ModelAdmin):
         "user",
         "played",
         "cut",
+        "autoplay",
         "created_at",
     )
     list_filter = (
         "played",
         "cut",
-        ('created_at', DateRangeFilter),
+        ("created_at", DateRangeFilter),
     )
     search_fields = ["playlist__song_name", "playlist__url", "user"]
 
@@ -59,7 +58,7 @@ class PlaylistOrderHistoryAdmin(admin.ModelAdmin):
 
 @admin.register(PlaylistOrderQueue)
 class PlaylistOrderQueueHistoryAdmin(admin.ModelAdmin):
-    ordering = ('order',)
+    ordering = ("order",)
     list_display = (
         "id",
         "order",
@@ -67,16 +66,16 @@ class PlaylistOrderQueueHistoryAdmin(admin.ModelAdmin):
         "playlist_order",
         "created_at",
     )
-    list_filter = (
-        ('created_at', DateRangeFilter),
-    )
-    search_fields = ["playlist_order__playlist__song_name", "playlist_order__playlist__url", "playlist_order__user"]
+    list_filter = (("created_at", DateRangeFilter),)
+    search_fields = [
+        "playlist_order__playlist__song_name",
+        "playlist_order__playlist__url",
+        "playlist_order__user",
+    ]
 
     def get_rangefilter_created_at_default(self, request):
         return (get_last_week, datetime.date.today)
 
-    @admin.display(ordering='playlist_order__user', description='點歌者')
+    @admin.display(ordering="playlist_order__user", description="點歌者")
     def get_user(self, obj):
         return obj.playlist_order.user
-
-

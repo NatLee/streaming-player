@@ -196,7 +196,7 @@ class get(APIView):
                 # 佇列中沒有任何歌曲，但還是把order設定爲總數+1，也就是0+1
                 now_order = PlaylistOrderQueue.objects.count()
                 result = PlaylistOrderQueue.objects.create(
-                    playlist_order=poh, order=now_order + 1
+                    playlist_order=poh, order=now_order + 1, autoplay=True
                 )
                 result = result.to_dict()
                 result["in_queue"] = False
