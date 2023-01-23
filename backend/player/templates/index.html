@@ -44,6 +44,8 @@
 
     <br /><br />
 
+    <h3>初次訪問此頁面要點擊播放之後的影片才會自動播放</h3>
+
     <h3>---- Song List ----</h3>
 
     <br />
@@ -88,6 +90,11 @@
         var videoPlayer = videojs("video");
         videoPlayer.muted(true);
       }
+      function unmute() {
+        var videoPlayer = videojs("video");
+        videoPlayer.muted(false);
+      }
+
       function cut() {
         cut_song_signal();
         location.reload();
@@ -115,6 +122,19 @@
         });
       }
 
+      function get_player_volume() {
+        var volume = window.localStorage.getItem("player-volume");
+        if (!volume) {
+          volume = 0.003;
+        }
+        return volume;
+      }
+
+      function set_player_volume(volume) {
+        var videoPlayer = videojs("video");
+        videoPlayer.volume(volume);
+      }
+
       function set_playlist(videoPlayer) {
         $.ajax({
           type: "GET",
@@ -126,6 +146,7 @@
             in_queue = playlist[0].in_queue;
             url = playlist[0].url;
             console.log(`------------------------------------`);
+            console.log(`播放器音量：` + videoPlayer.volume());
             console.log(`點播者： ` + user);
             console.log(`此ID是否於佇列中： ` + in_queue);
             console.log(`播放ID轉換： ` + now_playing_id + ` -> ` + new_id);
@@ -139,7 +160,6 @@
                   type: "video/mp4",
                   src: res.video_url,
                 });
-                mute();
                 $("#user").text(user);
                 $("#title").text(res.title);
                 $("#url").text(res.url);
@@ -175,41 +195,32 @@
         }
       }
 
-      function set_and_play() {
-        var videoPlayer = videojs("video");
-        videoPlayer.reloadSourceOnError({
-          getSource: function (reload) {
-            console.log("Reloading because of an error");
-            console.log("Set now playing ID to 0 -> reload playlist!");
-            now_playing_id = 0;
-            check_and_set_playlist(videoPlayer);
-          },
-          errorInterval: 5,
-        });
-        check_and_set_playlist(videoPlayer);
-      }
-
       function change_player_src() {
         var videoPlayer = videojs("video").ready(function () {
           var player = this;
-          player.on("ended", function () {
-            set_and_play();
+          player.volume(get_player_volume());
+          player.on("ended", () => {
+            check_and_set_playlist(player);
           });
-          set_and_play();
+          player.on("volumechange", () => {
+            window.localStorage.setItem("player-volume", player.volume());
+          });
+          player.reloadSourceOnError({
+            getSource: function (reload) {
+              console.log("Reloading because of an error");
+              console.log("Set now playing ID to 0 -> reload playlist!");
+              now_playing_id = 0;
+              check_and_set_playlist(player);
+            },
+            errorInterval: 5,
+          });
+          check_and_set_playlist(player);
         });
-      }
-
-      function init_player() {
-        $.when(
-          $.ajax("playlist/get").then((res) => {
-            change_player_src();
-          })
-        );
       }
 
       $(document).ready(function () {
         load_song_list();
-        init_player();
+        change_player_src();
       });
     </script>
   </body>
