@@ -167,6 +167,8 @@
                 $("#duration").text(res.duration);
                 console.log("Get new video");
                 console.log(res);
+                // 更新底下播放清單
+                load_song_list();
               },
               error: function (err) {
                 console.log(err);
@@ -197,9 +199,6 @@
       }
 
       function change_player_src() {
-        // 更新底下播放清單
-        load_song_list();
-
         var videoPlayer = videojs("video").ready(function () {
           var player = this;
           // 設定播放器音量
