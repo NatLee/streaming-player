@@ -198,22 +198,27 @@
       function change_player_src() {
         var videoPlayer = videojs("video").ready(function () {
           var player = this;
+          // 設定播放器音量
           player.volume(get_player_volume());
+          // 設定播放器結束事件
           player.on("ended", () => {
             check_and_set_playlist(player);
           });
+          // 設定播放器音量控制事件
           player.on("volumechange", () => {
             window.localStorage.setItem("player-volume", player.volume());
           });
+          // 設定播放器遇到ERROR處理
           player.reloadSourceOnError({
             getSource: function (reload) {
               console.log("Reloading because of an error");
               console.log("Set now playing ID to 0 -> reload playlist!");
               now_playing_id = 0;
-              check_and_set_playlist(player);
+              change_player_src(player);
             },
             errorInterval: 5,
           });
+          // 檢查並設定播放
           check_and_set_playlist(player);
         });
       }
