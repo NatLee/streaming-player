@@ -20,14 +20,7 @@ SITE_ID = 1
 
 # ----------------------------- START - DEBUG setting -------------------------------
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG')
-if DEBUG is None:
-    DEBUG = True
-else:
-    if isinstance(DEBUG, str):
-        DEBUG = literal_eval(DEBUG)
-    elif isinstance(DEBUG, bool):
-        pass
+DEBUG = False
 print(f"---------- Debug mode: {DEBUG}")
 # ------------------------------ END - DEBUG setting --------------------------------
 
@@ -38,7 +31,7 @@ ALLOWED_HOSTS = ["*"]
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
-    "http://*.127.0.0.1",
+    "http://127.0.0.1",
     "http://localhost",
     "https://natlee.info",
     "https://player.natlee.info"
