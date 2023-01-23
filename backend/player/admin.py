@@ -20,10 +20,14 @@ class PlaylistAdmin(SimpleHistoryAdmin):
         "song_name",
         "url",
         "duration",
+        "favorite",
+        "block",
         "last_played_at",
         "created_at",
     )
     list_filter = (
+        "favorite",
+        "block",
         ('created_at', DateRangeFilter),
     )
     search_fields = ["song_name", "url"]
@@ -43,6 +47,8 @@ class PlaylistOrderHistoryAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = (
+        "played",
+        "cut",
         ('created_at', DateRangeFilter),
     )
     search_fields = ["playlist__song_name", "playlist__url", "user"]
@@ -53,9 +59,11 @@ class PlaylistOrderHistoryAdmin(admin.ModelAdmin):
 
 @admin.register(PlaylistOrderQueue)
 class PlaylistOrderQueueHistoryAdmin(admin.ModelAdmin):
+    ordering = ('order',)
     list_display = (
         "id",
         "order",
+        "get_user",
         "playlist_order",
         "created_at",
     )
@@ -67,6 +75,8 @@ class PlaylistOrderQueueHistoryAdmin(admin.ModelAdmin):
     def get_rangefilter_created_at_default(self, request):
         return (get_last_week, datetime.date.today)
 
-
+    @admin.display(ordering='playlist_order__user', description='點歌者')
+    def get_user(self, obj):
+        return obj.playlist_order.user
 
 

@@ -40,7 +40,8 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://*.127.0.0.1",
     "http://localhost",
-    "https://natlee.info"
+    "https://natlee.info",
+    "https://player.natlee.info"
 ]
 # -------------- END - CORS Setting -----------------
 

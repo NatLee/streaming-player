@@ -11,6 +11,9 @@ class Playlist(models.Model):
     last_played_at = models.DateTimeField("最後播放時間", auto_now=True)
     duration = models.IntegerField("播放秒數", default=0)
 
+    favorite = models.BooleanField("是否收藏", default=False)
+    block = models.BooleanField("是否黑名單", default=False)
+
     history = HistoricalRecords(table_name="playlist_history")
 
     def __str__(self):
