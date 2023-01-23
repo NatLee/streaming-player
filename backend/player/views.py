@@ -191,12 +191,12 @@ class get(APIView):
                 # 這邊要選取favorite爲True的
                 rng_song = random.choice(Playlist.objects.all().filter(favorite=True))
                 poh = PlaylistOrderHistory.objects.create(
-                    playlist=rng_song, user="nightbot"
+                    playlist=rng_song, user="nightbot", autoplay=True
                 )
                 # 佇列中沒有任何歌曲，但還是把order設定爲總數+1，也就是0+1
                 now_order = PlaylistOrderQueue.objects.count()
                 result = PlaylistOrderQueue.objects.create(
-                    playlist_order=poh, order=now_order + 1, autoplay=True
+                    playlist_order=poh, order=now_order + 1
                 )
                 result = result.to_dict()
                 result["in_queue"] = False
