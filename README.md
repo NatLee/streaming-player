@@ -9,7 +9,7 @@ This is a player can be used on streaming.
 ![playlist-history](https://user-images.githubusercontent.com/10178964/213933824-d1545650-901a-4934-a0ea-3cde8ae7b311.png)
 
 ### APIs
-![apis](https://user-images.githubusercontent.com/10178964/214090798-9fa72632-9b20-4707-815f-deeac609a6d8.png)
+![apis](https://user-images.githubusercontent.com/10178964/214282464-f4de87b8-ae31-4ed5-9050-b10cb8afa090.png)
 
 
 ## Requirements
