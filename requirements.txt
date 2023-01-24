@@ -22,5 +22,5 @@ google-auth
 
 ipython # for debugging
 
-youtube-dl # for extracting redirect url from youtube
+yt_dlp # for extracting redirect url from youtube
 

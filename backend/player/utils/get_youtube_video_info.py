@@ -1,5 +1,5 @@
 from requests import get
-from youtube_dl import YoutubeDL
+from yt_dlp import YoutubeDL
 
 YDL_OPTIONS = {
     "quiet": True,
