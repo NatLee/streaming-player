@@ -199,6 +199,28 @@
         });
       }
 
+      function delete_song_in_queue(playing_id) {
+        console.log(`刪除佇列ID：` + playing_id);
+        $.ajax({
+          type: "GET",
+          dataType: "json",
+          url: "playlist/" + playing_id + "/delete",
+          success: function (res) {
+            console.log(res);
+            console.log("Reload playlist!");
+            $.ajax({
+              type: "GET",
+              dataType: "json",
+              url: "playlist/queue",
+              success: function (queue) {
+                html = render_song_list(queue);
+                document.getElementById("songlist").innerHTML = html;
+              },
+            });
+          },
+        });
+      }
+
       function render_song_list(queue) {
         html = "";
         queue.forEach(function (res) {
@@ -218,10 +240,17 @@
             res.user +
             "<br>" +
             res.url +
-            "<br>" +
+            "<br>";
+
+          html +=
             `<button onclick="insert_song_to_top(` +
             res.id +
             `)">插歌</button>`;
+
+          html +=
+            `<button onclick="delete_song_in_queue(` +
+            res.id +
+            `)">刪歌</button>`;
 
           if (order == 1) {
             html += "<br>------------------------";

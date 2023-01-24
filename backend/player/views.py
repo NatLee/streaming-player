@@ -27,7 +27,7 @@ def dashboard(request):
     return render(request, "index.html")
 
 
-def reoreder_playlist() -> int:
+def reorder_playlist() -> int:
     count = 0
     with transaction.atomic():
         # 這邊要重新排序，怕中間有被刪除的歌
@@ -120,6 +120,8 @@ class NightbotOrder(APIView):
         user = request.query_params.get("user", None)
         url = request.query_params.get("url", None)
 
+        print(f"{user} 使用 [{url}] 嘗試進行點歌！")
+
         if not url:
             return Response(f"哪有人點歌不輸入網址的！ -> [{url}]")
 
@@ -157,18 +159,20 @@ class NightbotOrder(APIView):
         )
         if queue:
             element = queue.first()
-            return Response(
-                f"這首歌被 {element.playlist_order.user} 點過，在佇列還沒播放！目前順位 {element.order}！"
-            )
+            order = element.order
+            user = element.playlist_order.user
+            if order == 1:
+                return Response(f"這首歌被 {user} 點過，順位 {order}，正在放送中！")
+            return Response(f"這首歌被 {user} 點過，在佇列還沒播放！目前順位 {order}！")
 
         # 佇列內沒人點過就存放到歷史記錄
         poh = PlaylistOrderHistory.objects.create(playlist=song, user=user)
 
         with transaction.atomic():
-            count = reoreder_playlist()
-            PlaylistOrderQueue.objects.create(playlist_order=poh, order=count + 1)
+            order = reorder_playlist()
+            PlaylistOrderQueue.objects.create(playlist_order=poh, order=order + 1)
 
-        return Response(f"{user} 無情點播了『{song.song_name}』！")
+        return Response(f"{user} 無情點播了『{song.song_name}』，播放順位是#{order+1}！")
 
 
 class NightbotCurrentSongInQueue(APIView):
@@ -269,7 +273,7 @@ class InsertSongInPlaylistQueue(APIView):
 
         # 怕有操作導致歌曲順序出問題
         # 先重新排列原本佇列
-        reoreder_playlist()
+        reorder_playlist()
 
         with transaction.atomic():
             # 取出佇列中播放順序大於指定位置的項目並把它們的順序都加一
@@ -400,6 +404,51 @@ class ShowSongInPlaylistQueue(APIView):
             )
 
         return Response(results)
+
+
+class DeleteSongInPlaylistQueue(APIView):
+    permission_classes = (AllowAny,)
+
+    @swagger_auto_schema(
+        operation_summary="GET",
+        operation_description="刪除佇列中特定ID的項目",
+        responses={
+            "200": openapi.Response(
+                description="message",
+                examples={
+                    "application/json": {
+                        "result": [],
+                        "code": 0,
+                    }
+                },
+            )
+        },
+    )
+    def get(self, request, get_id):
+
+        queryset = PlaylistOrderQueue.objects.filter(pk=get_id)
+        if not queryset:
+            return Response({"status": "failed", "description": "這個ID已經不存在於佇列中"})
+
+        obj = queryset.first()
+
+        order = obj.order
+        if order == 1:
+            return Response({"status": "failed", "description": "無法刪除佇列中第一個項目"})
+
+        user = obj.playlist_order.user
+        song_name = obj.playlist_order.playlist.song_name
+
+        obj.playlist_order.delete()
+        # 刪除後，重新排列queue的播放順序
+        reorder_playlist()
+
+        return Response(
+            {
+                "status": "ok",
+                "description": f"佇列中ID爲[{get_id}]由 {user} 點的歌已刪除，歌名爲『{song_name}』",
+            }
+        )
 
 
 class MarkSongAttribute(APIView):
@@ -557,7 +606,7 @@ class MarkSongAttribute(APIView):
                 result.delete()
                 msg += f"點播佇列中ID爲[{get_id}]的項目已經從佇列移除！\n"
                 # 移除後，重新指定當前播放順序（最優先爲1）
-                reoreder_playlist()
+                reorder_playlist()
 
         msg += "------------------------------------------\n"
         print(msg)

@@ -38,6 +38,11 @@ urlpatterns = [
         name="insert_song_in_playlist_with_order",
     ),
     path(
+        "playlist/<int:get_id>/delete",
+        views.DeleteSongInPlaylistQueue.as_view(),
+        name="delete_song_in_playlist",
+    ),
+    path(
         "playlist/queue",
         views.ShowSongInPlaylistQueue.as_view(),
         name="show_all_queue",
