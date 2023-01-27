@@ -1,8 +1,9 @@
 import random
+from collections import Counter
 
 from django.shortcuts import render
 from django.db import transaction
-
+from django.db.models import Sum
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -170,9 +171,24 @@ class NightbotOrder(APIView):
 
         with transaction.atomic():
             order = reorder_playlist()
+            total_seconds = PlaylistOrderQueue.objects.aggregate(
+                seconds=Sum("playlist_order__playlist__duration")
+            )["seconds"]
             PlaylistOrderQueue.objects.create(playlist_order=poh, order=order + 1)
 
-        return Response(f"{user} 無情點播了『{song.song_name}』，播放順位是#{order+1}！")
+        # 幫忙算等待時間
+        hours = total_seconds // 60 // 60
+        minutes = total_seconds // 60 - hours * 60
+        seconds = total_seconds % 60
+
+        if hours == 0:
+            time_hint = f"{minutes}分{seconds}秒"
+        else:
+            time_hint = f"{hours}時{minutes}分{seconds}秒"
+
+        return Response(
+            f"{user} 無情點播了『{song.song_name}』，播放順位是#{order+1}，還要再等{time_hint}！"
+        )
 
 
 class NightbotCurrentSongInQueue(APIView):
@@ -205,6 +221,46 @@ class NightbotCurrentSongInQueue(APIView):
             )
         return Response(
             f"現在播放的是 {obj.playlist_order.user} 點的『{obj.playlist_order.playlist.song_name}』，傳送門 -> {obj.playlist_order.playlist.url}"
+        )
+
+
+class NightbotUserCountRecord(APIView):
+    permission_classes = (AllowAny,)
+
+    @swagger_auto_schema(
+        operation_summary="GET",
+        operation_description="Nightbot拿到使用者歷史點歌數量",
+        responses={
+            "200": openapi.Response(
+                description="message",
+                examples={
+                    "application/json": {
+                        "result": [],
+                        "code": 0,
+                    }
+                },
+            )
+        },
+    )
+    def get(self, request, user):
+
+        history_objs = PlaylistOrderHistory.objects.filter(user=user)
+
+        if not history_objs:
+            return Response(f" {user} 這個人沒有點過歌哦！")
+
+        total_number = history_objs.count()
+        played_number = history_objs.filter(played=True).count()
+        percent = 100 * (played_number / total_number) if total_number > 0 else 0
+
+        unique_number = len(set(history_objs.values_list("playlist__url", flat=True)))
+
+        (_, most_song_name), most_count = Counter(
+            history_objs.values_list("playlist__url", "playlist__song_name")
+        ).most_common(1)[0]
+
+        return Response(
+            f"{user} 點歌次數有 {total_number} 次，播完的比例有 {percent:.2f} %，不重複的歌有 {unique_number} 首，最常點播的歌是 [{most_song_name}] ，高達 {most_count} 次"
         )
 
 

@@ -23,6 +23,11 @@ urlpatterns = [
         name="nightbot_current_song_in_queue",
     ),
     path(
+        "nightbot/order/<str:user>/count",
+        views.NightbotUserCountRecord.as_view(),
+        name="nightbot_user_count_record",
+    ),
+    path(
         "playlist/get",
         views.GetSongFromPlaylistQueue.as_view(),
         name="get_song_from_playlist_queue",
