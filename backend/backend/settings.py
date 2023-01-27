@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from datetime import timedelta
 
-logger= logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 print("-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-")
 
@@ -14,7 +14,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 print(f"---------- Project DIR: {BASE_DIR}")
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-natlee-9527-h0usnb4^27w+^)i*)f24$i3$$)(&1m@r0cj42wsi1n@9&+7@h)"
+SECRET_KEY = (
+    "django-insecure-natlee-9527-h0usnb4^27w+^)i*)f24$i3$$)(&1m@r0cj42wsi1n@9&+7@h)"
+)
 
 SITE_ID = 1
 
@@ -34,7 +36,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1",
     "http://localhost",
     "https://natlee.info",
-    "https://player.natlee.info"
+    "https://player.natlee.info",
 ]
 # -------------- END - CORS Setting -----------------
 
@@ -78,7 +80,7 @@ INSTALLED_APPS = [
     "userprofile",
     "player",
     # test
-    "ping"
+    "ping",
 ]
 
 MIDDLEWARE = [
@@ -115,6 +117,9 @@ TEMPLATES = [
 WSGI_APPLICATION = "backend.wsgi.application"
 
 # -------------- START - Swagger Setting --------------
+
+USE_X_FORWARDED_HOST = True
+
 SWAGGER_SETTINGS = {
     "SECURITY_DEFINITIONS": {
         "Token(add prefix `Bearer` yourself)": {
@@ -178,66 +183,52 @@ STATIC_URL = "api/__hidden_statics/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # -------------- START - Log setting --------------
-LOG_ROOT = Path(BASE_DIR) / 'logs'
+LOG_ROOT = Path(BASE_DIR) / "logs"
 LOG_ROOT.mkdir(exist_ok=True)
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': True,
-    'formatters': {
+    "version": 1,
+    "disable_existing_loggers": True,
+    "formatters": {
         # LOG格式
-        'standard': {
-            'format': '[%(asctime)s] [%(filename)s:%(lineno)d] [%(module)s:%(funcName)s] [%(levelname)s] - %(message)s'},
-        'simple': {  # 簡單格式
-            'format': '%(levelname)s %(message)s'
-        }
-    },
-    'filters': {
-    },
-    'handlers': {
-        'file': {
-            'class': 'common.log.InterceptTimedRotatingFileHandler',
-            'filename': f"{LOG_ROOT / 'srap.log'}",
-            'when': "H",
-            'interval': 1,
-            'backupCount': 1,
-            'formatter': 'standard',
-            'encoding': 'utf-8',
+        "standard": {
+            "format": "[%(asctime)s] [%(filename)s:%(lineno)d] [%(module)s:%(funcName)s] [%(levelname)s] - %(message)s"
         },
-        'database': {
-            'class': 'common.log.InterceptTimedRotatingFileHandler',
-            'filename': f"{LOG_ROOT / 'database.log'}",
-            'when': "H",
-            'interval': 1,
-            'backupCount': 1,
-            'formatter': 'standard',
-            'encoding': 'utf-8',
-        }
+        "simple": {"format": "%(levelname)s %(message)s"},  # 簡單格式
     },
-    'loggers': {
-        'django': {
-            'handlers': ['file'],
-            'propagate': True,
-            'level': "INFO"
+    "filters": {},
+    "handlers": {
+        "file": {
+            "class": "common.log.InterceptTimedRotatingFileHandler",
+            "filename": f"{LOG_ROOT / 'srap.log'}",
+            "when": "H",
+            "interval": 1,
+            "backupCount": 1,
+            "formatter": "standard",
+            "encoding": "utf-8",
         },
-        'celery': {
-            'handlers': ['file'],
-            'propagate': False,
-            'level': "INFO"
+        "database": {
+            "class": "common.log.InterceptTimedRotatingFileHandler",
+            "filename": f"{LOG_ROOT / 'database.log'}",
+            "when": "H",
+            "interval": 1,
+            "backupCount": 1,
+            "formatter": "standard",
+            "encoding": "utf-8",
         },
-        '''
+    },
+    "loggers": {
+        "django": {"handlers": ["file"], "propagate": True, "level": "INFO"},
+        "celery": {"handlers": ["file"], "propagate": False, "level": "INFO"},
+        """
         'django.db.backends': {
             'handlers': ['database'],
             'propagate': False,
             'level': "DEBUG"
         },
-        '''
-        'django.request': {
-            'handlers': ['file'],
-            'propagate': False,
-            'level': "DEBUG"
-        }
-    }
+        """
+        "django.request": {"handlers": ["file"], "propagate": False, "level": "DEBUG"},
+    },
 }
 
 # --------------- END - Log setting ---------------
@@ -259,7 +250,6 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
 }
 # ----------------------------- END - REST_FRAMEWORK setting ----------------------------
-
 
 
 # -------------- Start - SimpleJWT Setting --------------
