@@ -23,7 +23,7 @@ pip install -r requirements.txt
 ### Quick Start
 
 ```bat
-.\dev-start.bat
+docker-compose up
 ```
 
 See `http://localhost:8000/player/`

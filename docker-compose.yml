@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  player-backend-api-service:
+    container_name: player-backend-api-service
+    platform: linux/amd64
+    restart: always
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    volumes:
+      - ./backend:/app
+    command: bash docker-entrypoint.sh
+    environment:
+      - DEBUG=False
+    ports:
+      - 8000:8000
+    networks:
+      - player-backend-service-net
+
+networks:
+  player-backend-service-net:
+    driver: bridge
