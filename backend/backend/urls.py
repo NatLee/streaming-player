@@ -25,8 +25,6 @@ urlpatterns = []
 urlpatterns += [
     # admin
     path(f"{URL_PREFIX}/__hidden_admin/", admin.site.urls),
-    # debug dashboard
-    path(f"{URL_PREFIX}/__hidden_dev_dashboard", include("dev_dashboard.urls")),
 ]
 
 

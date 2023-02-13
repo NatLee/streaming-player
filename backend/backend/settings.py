@@ -74,7 +74,6 @@ INSTALLED_APPS = [
     "simple_history",
     "author",
     # custom
-    "dev_dashboard",
     "custom_jwt",
     "custom_auth",
     "userprofile",
@@ -128,7 +127,7 @@ SWAGGER_SETTINGS = {
             "in": "header",
         }
     },
-    "LOGIN_URL": "/api/__hidden_dev_dashboard/login",
+    "LOGIN_URL": "/api/__hidden_admin/login",
     "LOGOUT_URL": "/api/__hidden_admin/logout/?next=/api/__hidden_swagger",
 }
 
