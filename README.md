@@ -3,14 +3,16 @@
 This is a player can be used on streaming.
 
 ### Playlist
+
 ![playlist](https://user-images.githubusercontent.com/10178964/213933850-a9dfa041-7d69-4600-8e18-b8b71f026157.png)
 
 ### History
+
 ![playlist-history](https://user-images.githubusercontent.com/10178964/213933824-d1545650-901a-4934-a0ea-3cde8ae7b311.png)
 
 ### APIs
-![apis](https://user-images.githubusercontent.com/10178964/214282464-f4de87b8-ae31-4ed5-9050-b10cb8afa090.png)
 
+![apis](https://user-images.githubusercontent.com/10178964/214282464-f4de87b8-ae31-4ed5-9050-b10cb8afa090.png)
 
 ## Requirements
 
@@ -22,11 +24,29 @@ pip install -r requirements.txt
 
 ### Quick Start
 
-```bat
-docker-compose up
-```
+1. Run the service.
 
-See `http://localhost:8000/player/`
+   ```bat
+   docker-compose up
+   ```
+
+   See `http://localhost:8000/player/`
+
+2. Migrate.
+
+   ```
+   bash ./dev-migrate.sh
+   ```
+
+3. Add superuser.
+
+   ```
+   bash ./dev-create-superuser.sh
+   ```
+
+4. Check backend.
+
+   Go here http://localhost:8000/api/\_\_hidden_admin/login/ and login as `admin`.
 
 ## Link
 
@@ -35,9 +55,3 @@ See `http://localhost:8000/player/`
 - [Redoc](http://localhost:8000/api/__hidden_redoc)
 
 - [Swagger](http://localhost:8000/api/__hidden_swagger)
-
-- [Session Login with Rest Framework](http://localhost:8000/api/__hidden_dev_dashboard/login)
-
-- [JWT Login](http://localhost:8000/api/__hidden_dev_dashboard/login)
-
-- [DEV dashboard](http://localhost:8000/api/__hidden_dev_dashboard/dashboard)
