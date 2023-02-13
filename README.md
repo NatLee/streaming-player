@@ -30,7 +30,7 @@ pip install -r requirements.txt
    docker-compose up
    ```
 
-   See `http://localhost:8000/player/`
+   See http://localhost:8000/player/
 
 2. Migrate.
 
@@ -46,14 +46,14 @@ pip install -r requirements.txt
 
 4. Check backend.
 
-   Go here http://localhost:8000/api/\_\_hidden_admin/login/ and login as `admin`.
+   Go here http://localhost:8000/api/__hidden_admin/login/ and login as `admin`.
    
    And you'll see the page below.
    ![](https://user-images.githubusercontent.com/10178964/218362625-839d20df-8350-4082-a25f-501cad8824d8.png)
 
 5. (Optional) Check Swagger.
 
-   Go here http://localhost:8000/api/\_\_hidden_swagger/ .
+   Go here http://localhost:8000/api/__hidden_swagger/ .
 
 
 
