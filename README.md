@@ -30,9 +30,7 @@ pip install -r requirements.txt
    docker-compose up
    ```
 
-   See http://localhost:8000/player/
-
-2. Migrate.
+2. Make migrations and we just use SQLite as our database.
 
    ```
    bash ./dev-migrate.sh
@@ -55,6 +53,9 @@ pip install -r requirements.txt
 
    Go here http://localhost:8000/api/__hidden_swagger/ .
 
+6. (Optional) Check player in frontend.
+
+   See http://localhost:8000/player/
 
 
 ## Link
