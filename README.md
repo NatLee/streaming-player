@@ -47,6 +47,15 @@ pip install -r requirements.txt
 4. Check backend.
 
    Go here http://localhost:8000/api/\_\_hidden_admin/login/ and login as `admin`.
+   
+   And you'll see the page below.
+   ![](https://user-images.githubusercontent.com/10178964/218362625-839d20df-8350-4082-a25f-501cad8824d8.png)
+
+5. (Optional) Check Swagger.
+
+   Go here http://localhost:8000/api/\_\_hidden_swagger/ .
+
+
 
 ## Link
 
