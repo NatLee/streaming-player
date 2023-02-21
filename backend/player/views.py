@@ -76,7 +76,7 @@ class YoutubeVideoInfo(APIView):
         try:
             result = get_youtube_video_info(url)
         except Exception as e:
-            return {"status": "failed", "description": "獲取Youtube Video URL失敗"}
+            return Response({"status": "failed", "description": "獲取Youtube Video URL失敗 -> {e}"})
 
         return Response(result)
 
