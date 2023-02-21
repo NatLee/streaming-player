@@ -40,7 +40,7 @@ def reorder_playlist() -> int:
 
 
 class YoutubeVideoInfo(APIView):
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated,)
 
     @swagger_auto_schema(
         operation_summary="GET",
@@ -176,6 +176,10 @@ class NightbotOrder(APIView):
             )["seconds"]
             PlaylistOrderQueue.objects.create(playlist_order=poh, order=order + 1)
 
+        if total_seconds is None:
+            return Response(
+                f"Sorry {user}！遇到了一點錯誤，無法點播！請稍後再試一次！"
+            )
         # 幫忙算等待時間
         hours = total_seconds // 60 // 60
         minutes = total_seconds // 60 - hours * 60
@@ -189,7 +193,6 @@ class NightbotOrder(APIView):
         return Response(
             f"{user} 無情點播了『{song.song_name}』，播放順位是#{order+1}，還要再等{time_hint}！"
         )
-
 
 class NightbotCurrentSongInQueue(APIView):
     permission_classes = (AllowAny,)
@@ -222,7 +225,6 @@ class NightbotCurrentSongInQueue(APIView):
         return Response(
             f"現在播放的是 {obj.playlist_order.user} 點的『{obj.playlist_order.playlist.song_name}』，傳送門 -> {obj.playlist_order.playlist.url}"
         )
-
 
 class NightbotUserCountRecord(APIView):
     permission_classes = (AllowAny,)
@@ -263,9 +265,8 @@ class NightbotUserCountRecord(APIView):
             f"{user} 點歌次數有 {total_number} 次，播完的比例有 {percent:.2f} %，不重複的歌有 {unique_number} 首，最常點播的歌是 [{most_song_name}] ，高達 {most_count} 次"
         )
 
-
 class InsertSongInPlaylistQueue(APIView):
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated,)
 
     @swagger_auto_schema(
         operation_summary="GET",
@@ -351,9 +352,8 @@ class InsertSongInPlaylistQueue(APIView):
             }
         )
 
-
 class GetSongFromPlaylistQueue(APIView):
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated,)
 
     @swagger_auto_schema(
         operation_summary="GET",
@@ -415,9 +415,8 @@ class GetSongFromPlaylistQueue(APIView):
         print(msg)
         return Response(results)
 
-
 class ShowSongInPlaylistQueue(APIView):
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated,)
 
     @swagger_auto_schema(
         operation_summary="GET",
@@ -461,9 +460,8 @@ class ShowSongInPlaylistQueue(APIView):
 
         return Response(results)
 
-
 class DeleteSongInPlaylistQueue(APIView):
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated,)
 
     @swagger_auto_schema(
         operation_summary="GET",
@@ -506,9 +504,8 @@ class DeleteSongInPlaylistQueue(APIView):
             }
         )
 
-
 class MarkSongAttribute(APIView):
-    permission_classes = (AllowAny,)
+    permission_classes = (IsAuthenticated,)
 
     @swagger_auto_schema(
         operation_summary="GET",
@@ -673,3 +670,5 @@ class MarkSongAttribute(APIView):
             )
 
         return Response({"status": "ok", "description": f"點播佇列中ID爲[{get_id}]的狀態已改變"})
+
+
