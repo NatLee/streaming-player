@@ -26,7 +26,6 @@ class PlaylistAdmin(SimpleHistoryAdmin):
     list_filter = (
         "favorite",
         "block",
-        ("created_at", DateRangeFilter),
     )
     search_fields = ["song_name", "url"]
 
