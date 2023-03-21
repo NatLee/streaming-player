@@ -464,7 +464,6 @@
         });
       }
 
-
       function render_song_list(queue) {
         html = "";
         queue.forEach(function (res) {
@@ -483,8 +482,9 @@
             `<br>` +
             `點歌者：` + res.user +
             `<br>` +
-            `URL：` + `<a href="` + res.url + `">` + res.url + `</a>` +
+            `URL：` + `<a href="` + res.url + `">` + res.url + `</a>` + `  <button onclick=navigator.clipboard.writeText("` + res.url + `")>Copy</button>` +
             `<br>`;
+
 
           if (order != 1) {
             // 第一首可直接操作最上方的按鈕，不用在旁邊加按鈕
