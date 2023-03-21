@@ -241,7 +241,7 @@ class NightbotDeleteFromQueue(APIView):
         if not user:
             return Response(f"記得要填使用者！ -> [{user}]")
 
-        if 'http' in song_id:
+        if 'http' in song_id or len(song_id) > 20:
             return Response(f"{user}要砍歌請 -> https://www.youtube.com/watch?v=<輸入這邊的ID>")
 
         try:
