@@ -243,6 +243,16 @@
 
       // ----------------------------------------------
 
+      /*
+      // polling 暫放區
+      // TODO 偵測當前投票數量是否卡歌（沒websocket的做法）
+      var sleep = duration => new Promise(resolve => setTimeout(resolve, duration))
+      var poll = (promiseFn, duration) => promiseFn().then(
+                   sleep(duration).then(() => poll(promiseFn, duration)))
+      
+      // Greet the World every second
+      poll(() => new Promise(() => console.log('Hello World!')), 3000)
+      */
 
       var now_playing_id = 0;
 
@@ -262,7 +272,6 @@
         var videoPlayer = videojs("video");
         videoPlayer.muted(false);
       }
-
       function insert_song_signal(playing_id, order) {
         console.log(`指定播放順序，佇列ID：` + playing_id);
         $.ajax({
