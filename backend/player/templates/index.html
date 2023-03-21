@@ -1,6 +1,7 @@
 {% load bootstrap3 %}
 <html>
   <head>
+    <meta charset="UTF-8">
     <link rel="shortcut icon" href="#" />
     <link
       rel="stylesheet"
@@ -8,6 +9,13 @@
       href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.1.1/css/fontawesome.min.css"
     />
     <link href="https://vjs.zencdn.net/7.11.4/video-js.css" rel="stylesheet" />
+
+    <meta name="google-signin-scope" content="profile email">
+    <meta name="google-signin-client_id"
+        content="376808175534-d6mefo6b1kqih3grjjose2euree2g3cs.apps.googleusercontent.com">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  </head>
 
     {% bootstrap_css %}
   </head>
@@ -66,8 +74,22 @@
     <h3>---- JWT ----</h3>
     <br />
     <div id="token"></div>
-    <button onclick="javascript:location.href='/api/__hidden_admin/'" >Login</button>
     <br />
+    <button onclick="javascript:location.href='/api/__hidden_admin/'" >Admin Login</button>
+    <br />
+    <br />
+    <button onclick=logout()>JWT Logout</button>
+    <br />
+    <br />
+    <div id="g_id_onload"
+        data-client_id="376808175534-d6mefo6b1kqih3grjjose2euree2g3cs.apps.googleusercontent.com"
+        data-callback="get_jwt_using_google_credential"
+        data-auto_prompt="false">
+    </div>
+    <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline"
+            data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left">
+      </div>
+
     </div>
 
     <script
@@ -80,6 +102,53 @@
     {% bootstrap_javascript %}
 
     <script>
+
+      // ----------------------------------------------
+
+      // 3rd-party login
+
+      function get_jwt_using_google_credential(data) {
+        const credential = data.credential;
+        $.ajax({
+            method: "POST",
+            url: "/api/auth/google/token",
+            data: { credential: credential }
+        }).done(function (data) {
+            const access_token = data.access_token;
+            const refresh_token = data.refresh_token;
+            localStorage.setItem('access_token', access_token);
+            localStorage.setItem('refresh_token', refresh_token);
+            console.log('Google Login');
+            $.ajax({
+                type: "POST",
+                url: "/api/auth/token/verify",
+                data: {"token":access_token},
+                headers: {
+                    "Authorization": "Bearer" + " " + access_token
+                },
+                success: function (data) {
+                    var json_string = JSON.stringify(data, null, 2);
+                    console.log(data);
+                    location.reload();
+                },
+                error: function (data) {
+                    console.log(data);
+                }
+            });
+        });
+      }
+
+      // ----------------------------------------------
+
+      // Logout
+
+      function logout() {
+        window.localStorage.removeItem("refresh_token");
+        window.localStorage.removeItem("access_token");
+        window.location.href = "/player/";
+        location.reload();
+      }
+
 
       // ----------------------------------------------
 
@@ -207,6 +276,32 @@
         });
       }
 
+      function favorite_song(playing_id) {
+        console.log(`將歌曲加入收藏，佇列ID：` + playing_id);
+        $.ajax({
+          type: "GET",
+          dataType: "json",
+          headers: get_auth_headers(),
+          url: "playlist/" + playing_id + "/mark?favorite=true",
+          success: function (res) {
+            console.log(res);
+          },
+        });
+      }
+
+      function unfavorite_song(playing_id) {
+        console.log(`將歌曲解除收藏，佇列ID：` + playing_id);
+        $.ajax({
+          type: "GET",
+          dataType: "json",
+          headers: get_auth_headers(),
+          url: "playlist/" + playing_id + "/mark?favorite=false",
+          success: function (res) {
+            console.log(res);
+          },
+        });
+      }
+
       function cut_song_signal() {
         if (now_playing_id != 0) {
           console.log(`沒播完，直接卡掉，移除佇列ID：` + now_playing_id);
@@ -246,31 +341,13 @@
 
       function favorite_song_signal() {
         if (now_playing_id != 0) {
-          console.log(`將歌曲加入收藏，佇列ID：` + now_playing_id);
-          $.ajax({
-            type: "GET",
-            dataType: "json",
-            headers: get_auth_headers(),
-            url: "playlist/" + now_playing_id + "/mark?favorite=true",
-            success: function (res) {
-              console.log(res);
-            },
-          });
+          favorite_song(now_playing_id);
         }
       }
 
       function unfavorite_song_signal() {
         if (now_playing_id != 0) {
-          console.log(`將歌曲解除收藏，佇列ID：` + now_playing_id);
-          $.ajax({
-            type: "GET",
-            dataType: "json",
-            headers: get_auth_headers(),
-            url: "playlist/" + now_playing_id + "/mark?favorite=false",
-            success: function (res) {
-              console.log(res);
-            },
-          });
+          unfavorite_song(now_playing_id);
         }
       }
 
@@ -340,39 +417,103 @@
         });
       }
 
+      function delete_and_block_song(playing_id) {
+        console.log(
+          `還沒播，直接刪掉並加入黑名單，移除佇列ID：` + playing_id
+        );
+        $.ajax({
+          type: "GET",
+          dataType: "json",
+          headers: get_auth_headers(),
+          url: "playlist/" + playing_id + "/delete",
+          success: function (res) {
+            console.log(res); // 刪掉的結果
+            $.ajax({
+              type: "GET",
+              dataType: "json",
+              headers: get_auth_headers(),
+              url:
+                "playlist/" +
+                playing_id +
+                "/mark?cut=true&delete=true&block=true",
+              success: function (res) {
+                console.log(res); // BAN掉的結果
+                console.log("Reload playlist!");
+                $.ajax({
+                  type: "GET",
+                  dataType: "json",
+                  headers: get_auth_headers(),
+                  url: "playlist/queue",
+                  success: function (queue) {
+                    html = render_song_list(queue); // 重新整理清單
+                    document.getElementById("songlist").innerHTML = html;
+                  },
+                });
+              },
+            });
+          },
+        });
+      }
+
+
       function render_song_list(queue) {
         html = "";
         queue.forEach(function (res) {
           var order = res.order;
           if (order == 1) {
             html +=
-              "------------------------<br>第一首<br>" + res.order + "<br>";
+              "------------------------<br>這是第一首歌<br>#" + res.order + "<br>";
           } else {
-            html += res.order + "<br>";
+            html += "點歌順序#" + res.order + "<br>";
           }
 
           html +=
-            res.id +
-            "<br>" +
-            res.song_name +
-            "<br>" +
-            res.user +
-            "<br>" +
-            res.url +
-            "<br>";
+            `記錄ID#` + res.id +
+            `<br>` +
+            `歌名：` + res.song_name +
+            `<br>` +
+            `點歌者：` + res.user +
+            `<br>` +
+            `URL：` + `<a href="` + res.url + `">` + res.url + `</a>` +
+            `<br>`;
 
-          html +=
-            `<button onclick="insert_song_to_top(` +
-            res.id +
-            `)">插歌</button>`;
+          if (order != 1) {
+            // 第一首可直接操作最上方的按鈕，不用在旁邊加按鈕
 
-          html +=
-            `<button onclick="delete_song_in_queue(` +
-            res.id +
-            `)">刪歌</button>`;
+            html +=
+              `<button onclick="insert_song_to_top(` +
+              res.id +
+              `)">插歌</button>`;
+            html += `   `;
+
+            html +=
+              `<button onclick="favorite_song(` +
+              res.id +
+              `)">加最愛</button>`;
+            html += `   `;
+
+            html +=
+              `<button onclick="unfavorite_song(` +
+              res.id +
+              `)">移除最愛</button>`;
+            html += `   `;
+
+            html +=
+              `<button onclick="delete_song_in_queue(` +
+              res.id +
+              `)">刪歌</button>`;
+            html += `   `;
+
+            html +=
+              `<button onclick="delete_and_block_song(` +
+              res.id +
+              `)">刪歌拉黑單</button>`;
+            html += `   `;
+
+          }
 
           if (order == 1) {
-            html += "<br>------------------------";
+            html += "------------------------";
           }
 
           html += "<br><br><br>";
