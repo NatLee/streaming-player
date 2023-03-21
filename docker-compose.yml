@@ -11,8 +11,6 @@ services:
     volumes:
       - ./backend:/app
     command: bash docker-entrypoint.sh
-    environment:
-      - DEBUG=False
     ports:
       - 8000:8000
     networks:
