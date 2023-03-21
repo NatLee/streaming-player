@@ -86,6 +86,7 @@
       // JWT
 
       function get_jwt_token_and_refresh() {
+        // 從storage取得AUTH的token跟refresh token
         var jwt_token = localStorage.getItem("access_token");
         var jwt_token_refresh = localStorage.getItem("refresh_token");
         var data = {
@@ -100,6 +101,7 @@
       }
 
       function get_auth_headers() {
+        // 取得AUTH並放到HEADERS
         var data = get_jwt_token_and_refresh();
         var headers = {
           Authorization: "Bearer" + " " + data.token,
