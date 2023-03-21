@@ -80,7 +80,6 @@ class YoutubeVideoInfo(APIView):
 
         return Response(result)
 
-
 class NightbotOrder(APIView):
     permission_classes = (AllowAny,)
 
@@ -194,6 +193,74 @@ class NightbotOrder(APIView):
             f"{user} 無情點播了『{song.song_name}』，播放順位是#{order+1}，還要再等{time_hint}！"
         )
 
+class NightbotDeleteFromQueue(APIView):
+    permission_classes = (AllowAny,)
+
+    @swagger_auto_schema(
+        operation_summary="GET",
+        operation_description="Nightbot 刪歌 API",
+        responses={
+            "200": openapi.Response(
+                description="message",
+                examples={
+                    "application/json": {
+                        "result": [],
+                        "code": 0,
+                    }
+                },
+            )
+        },
+        manual_parameters=[
+            openapi.Parameter(
+                name="user",
+                in_=openapi.IN_QUERY,
+                description="點歌者",
+                type=openapi.TYPE_STRING,
+                required=True,
+                value="nightbot",
+            ),
+            openapi.Parameter(
+                name="song_id",
+                in_=openapi.IN_QUERY,
+                description="歌曲ID",
+                type=openapi.TYPE_STRING,
+                required=True,
+                value="JJo-zUi9E5U",
+            ),
+        ],
+    )
+    def get(self, request):
+        user = request.query_params.get("user", None)
+        song_id = request.query_params.get("song_id", None)
+
+        print(f"{user} 使用 [{song_id}] 嘗試進行砍歌！")
+
+        if not song_id:
+            return Response(f"哪有人砍歌不輸入ID的！ -> [{song_id}]")
+
+        if not user:
+            return Response(f"記得要填使用者！ -> [{user}]")
+
+        if 'http' in song_id:
+            return Response(f"{user}要砍歌請 -> https://www.youtube.com/watch?v=<輸入這邊的ID>")
+
+        try:
+            song_in_queue = PlaylistOrderQueue.objects.get(playlist_order__user=user, playlist_order__playlist__url=f'https://www.youtube.com/watch?v={song_id}')
+        except PlaylistOrderQueue.DoesNotExist:
+            return Response(f"{user}，現在的佇列沒有這首歌啊！")
+
+        order = song_in_queue.order
+        if order == 1:
+            return Response(f"{user}，正在播的歌沒辦法刪除ㄛ！")
+
+        with transaction.atomic():
+            history_order_obj = song_in_queue.playlist_order
+            song_name = history_order_obj.playlist.song_name
+            history_order_obj.delete()
+        return Response(
+            f"{user} 無情砍了 #{order} 『{song_name}』"
+        )
+
 class NightbotCurrentSongInQueue(APIView):
     permission_classes = (AllowAny,)
 
@@ -255,6 +322,21 @@ class NightbotUserCountRecord(APIView):
         played_number = history_objs.filter(played=True).count()
         percent = 100 * (played_number / total_number) if total_number > 0 else 0
 
+        total_durations = sum(history_objs.filter(played=True).values_list('playlist__duration', flat=True))
+        duration_min = total_durations // 60 % 60
+        duration_hour = total_durations // 60 // 60 % 24
+        duration_day = total_durations // 60 // 60 // 24
+        duration_sec = total_durations % 60
+        duration_str = ''
+        if duration_day != 0:
+            duration_str += f'{duration_day} 天 '
+        if duration_hour != 0:
+            duration_str += f'{duration_hour} 時 '
+        if duration_min != 0:
+            duration_str += f'{duration_min} 分 '
+        if duration_sec != 0:
+            duration_str += f'{duration_sec} 秒'
+
         unique_number = len(set(history_objs.values_list("playlist__url", flat=True)))
 
         (_, most_song_name), most_count = Counter(
@@ -262,7 +344,7 @@ class NightbotUserCountRecord(APIView):
         ).most_common(1)[0]
 
         return Response(
-            f"{user} 點歌次數有 {total_number} 次，播完的比例有 {percent:.2f} %，不重複的歌有 {unique_number} 首，最常點播的歌是 [{most_song_name}] ，高達 {most_count} 次"
+            f"{user} 點歌次數有 {total_number} 次，播完的比例有 {percent:.2f} %，總共 {duration_str}，不重複的歌有 {unique_number} 首，最常點播的歌是 [{most_song_name}] ，高達 {most_count} 次"
         )
 
 class InsertSongInPlaylistQueue(APIView):

@@ -56,7 +56,7 @@ class PlaylistOrderHistoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(PlaylistOrderQueue)
-class PlaylistOrderQueueHistoryAdmin(admin.ModelAdmin):
+class PlaylistOrderQueueAdmin(admin.ModelAdmin):
     ordering = ("order",)
     list_display = (
         "id",

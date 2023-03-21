@@ -18,6 +18,11 @@ urlpatterns = [
         name="nightbot_order",
     ),
     path(
+        "nightbot/delete",
+        views.NightbotDeleteFromQueue.as_view(),
+        name="nightbot_delete",
+    ),
+    path(
         "nightbot/current",
         views.NightbotCurrentSongInQueue.as_view(),
         name="nightbot_current_song_in_queue",
