@@ -9,14 +9,15 @@
     <link href="https://vjs.zencdn.net/7.11.4/video-js.css" rel="stylesheet" />
 
     <style>
+
       body {
         font-family: Arial, sans-serif;
         background-color: #1c1c1c;
         color: #ccc;
         margin: 0;
-        padding: 0;
+        padding: 0 0 0 60px;
       }
-    
+
       .container {
         max-width: 960px;
         margin: 0 auto;
@@ -34,18 +35,239 @@
         margin-bottom: 10px;
       }
     
-      video-js {
-        display: block;
-        margin-bottom: 20px;
-      }
-    
       .buttons {
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
       }
-    
       button {
+        background-color: #bba35c;
+        color: #fff;
+        border: 2px solid #ddc588;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 16px;
+        border-radius: 5px;
+        text-transform: uppercase;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        position: relative;
+        overflow: hidden; /* 隐藏溢出的内容 */
+      }
+      
+      button:hover {
+        background-color: #ddc588;
+        border-color: #f0deaf;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        animation: shake 0.2s;
+      }
+      
+      button:active {
+        transform: scale(0.95) translateY(0);
+        opacity: 0.8;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      button:before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.1);
+        opacity: 0;
+        transition: all 0.3s ease;
+        pointer-events: none;
+      }
+      
+      button:hover:before {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      @keyframes shake {
+        0% { transform: translateY(-2px) translateX(0); }
+        25% { transform: translateY(-2px) translateX(2px); }
+        50% { transform: translateY(-2px) translateX(0); }
+        75% { transform: translateY(-2px) translateX(-2px); }
+        100% { transform: translateY(-2px) translateX(0); }
+      }
+
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .songlist, .token {
+      margin-bottom: 20px;
+    }
+
+    .info-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .info-label {
+      font-weight: bold;
+      color: #bba35c;
+    }
+    
+    .info-value {
+      color: #ccc;
+    }
+
+    /* Player layout */
+    .video-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      margin-bottom: 20px;
+    }
+    
+    .video-js {
+      border: 4px solid #bba35c;
+      border-radius: 10px;
+    }
+
+    /* Dashboard layout */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-gap: 20px;
+    }
+  
+    .left-section {
+      background-color: #333;
+      border-radius: 5px;
+      padding: 20px;
+    }
+
+    .right-section {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .section-title {
+      color: #bba35c;
+      border-bottom: 1px solid #bba35c;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .section-content {
+      background-color: rgba(187, 163, 92, 0.1);
+      padding: 15px;
+      border-radius: 10px;
+      color: #ccc;
+      margin-bottom: 10px;
+    }
+
+      /* 選單按鈕樣式 */
+      .menu-btn {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 200;
+        width: 30px;
+        height: 20px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        user-select: none;
+      }
+
+      .menu-btn span {
+        height: 3px;
+        background-color: #bba35c; /* 修改顏色 */
+        border-radius: 2px; /* 添加圓角 */
+        transition: all 0.3s ease;
+      }
+      
+      .menu-btn:hover span:nth-child(1) {
+        transform: translateY(6px) rotate(45deg);
+      }
+      
+      .menu-btn:hover span:nth-child(2) {
+        transform: scaleX(0);
+      }
+      
+      .menu-btn:hover span:nth-child(3) {
+        transform: translateY(-6px) rotate(-45deg);
+      }
+      
+      .menu-btn:active {
+        transform: scale(0.95);
+        opacity: 0.8;
+      }
+
+      /* 選單列表樣式 */
+      .menu-list {
+        position: fixed;
+        top: 60px;
+        left: 20px;
+        z-index: 100;
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+      }
+      
+      .menu-list li {
+        background-color: #333;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 10px;
+        opacity: 0;
+        transform: translateY(20px);
+        transition: all 0.4s;
+        pointer-events: none;
+        visibility: hidden;
+      }
+
+      .menu-list li:nth-child(1) {
+        transition-delay: 0s;
+      }
+      
+      .menu-list li:nth-child(2) {
+        transition-delay: 0.2s;
+      }
+      
+      .menu-list li.visible {
+        opacity: 1;
+        transform: translateY(0px);
+        pointer-events: auto;
+        visibility: visible;
+      }
+
+      .menu-item {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background-color: #333;
+        padding: 15px;
+        border-radius: 5px;
+      }
+
+      .g_id_signin {
+        margin-bottom: 10px;
+      }
+
+      .menu-item-btn {
         background-color: #bba35c;
         color: #fff;
         border: 2px solid #ddc588;
@@ -56,120 +278,12 @@
         text-transform: uppercase;
         transition: background-color 0.3s, border-color 0.3s;
       }
-    
-      button:hover {
+      
+      .menu-item-btn:hover {
         background-color: #ddc588;
         border-color: #f0deaf;
       }
 
-      button:active {
-        transform: scale(0.95);
-        opacity: 0.8;
-      }
-
-      .button-group {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 10px;
-      }
-
-      .songlist, .token {
-        margin-bottom: 20px;
-      }
-
-      .info-container {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-bottom: 20px;
-      }
-      
-      .info-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      
-      .info-label {
-        font-weight: bold;
-        color: #bba35c;
-      }
-      
-      .info-value {
-        color: #ccc;
-      }
-
-      /* Player layout */
-      .video-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-        height: 100%;
-        margin-bottom: 20px;
-      }
-      
-      .video-js {
-        border: 4px solid #bba35c;
-        border-radius: 10px;
-      }
-
-      /* Dashboard layout */
-      .dashboard {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-gap: 20px;
-      }
-    
-      .left-section {
-        background-color: #333;
-        border-radius: 5px;
-        padding: 20px;
-      }
-
-      .right-section {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-      }
-      
-      .section-title {
-        color: #bba35c;
-        border-bottom: 1px solid #bba35c;
-        padding-bottom: 10px;
-        margin-bottom: 10px;
-      }
-      
-      .section-content {
-        background-color: rgba(187, 163, 92, 0.1);
-        padding: 15px;
-        border-radius: 10px;
-        color: #ccc;
-      }
-
-      .jwt-container {
-        display: flex;
-        align-items: center;
-        gap: 20px;
-      }
-
-      .session-container {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .session-button {
-        flex-grow: 1;
-        text-align: center;
-      }
-
-      /* Scrollable song list */
-      .songlist {
-        max-height: 300px;
-        overflow-y: auto;
-      }
     </style>
 
     <meta name="google-signin-scope" content="profile email">
@@ -177,12 +291,32 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <div id="g_id_onload" data-client_id="376808175534-d6mefo6b1kqih3grjjose2euree2g3cs.apps.googleusercontent.com" data-callback="get_jwt_using_google_credential" data-auto_prompt="false" />
 
-
   </head>
-
-  </head>
-
+ 
   <body>
+
+    <div class="menu-btn" onclick="toggleMenu()">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+    <ul class="menu-list" id="menuList">
+      <li class="hidden">
+        <div class="menu-item">
+          <h3 class="section-title">JWT Login</h3>
+          <div id="token" class="section-content"></div>
+          <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+          <button class="menu-item-btn" onclick="logout()">Logout</button>
+        </div>
+      </li>
+      <li class="hidden">
+        <div class="menu-item">
+          <h3 class="section-title">Session Login</h3>
+          <button class="menu-item-btn" onclick="javascript:location.href='/api/__hidden_admin/'">Login</button>
+          <button class="menu-item-btn" onclick="javascript:location.href='/api/__hidden_admin/logout/'">Logout</button>
+        </div>
+      </li>
+    </ul>
 
     <div class="container">
       <div class="video-container">
@@ -224,40 +358,32 @@
           <div class="button-group">
             <button onclick="play()">Play</button>
             <button onclick="pause()">Pause</button>
+          </div>
+
+            <div class="button-group">
             <button onclick="mute()">Mute</button>
             <button onclick="unmute()">Unmute</button>
           </div>
         
           <div class="button-group">
+            <button onclick="pass()">Pass</button>
             <button onclick="cut()">Cut</button>
             <button onclick="cut_and_block()">Cut & Block</button>
+          </div>
+
+          <div class="button-group">
             <button onclick="favorite()">Favorite</button>
             <button onclick="unfavorite()">Unfavorite</button>
           </div>
-        
-          <div class="button-group">
-            <button onclick="load_song_list()">Reload Song List</button>
-          </div>
+
         </div>
 
         <div class="right-section">
+          <div class="button-group">
+            <button onclick="load_song_list()">Reload Song List</button>
+          </div>
           <h3 class="section-title">Song List</h3>
           <div id="songlist" class="section-content"></div>
-        
-          <h3 class="section-title">JWT</h3>
-          <div class="jwt-container">
-            <div id="token" class="section-content"></div>
-            <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
-          </div>
-          <button onclick=logout()>JWT Logout</button>
-
-          <h3 class="section-title">Session</h3>
-          <div class="session-container">
-            <button class="session-button" onclick="javascript:location.href='/api/__hidden_admin/'">Login</button>
-            <button class="session-button" onclick="javascript:location.href='/api/__hidden_admin/logout/'">Logout</button>
-          </div>
-        
-
       </div>
     </div>
 
@@ -266,6 +392,30 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
+
+      // ----------------------------------------------
+
+      // menu
+
+      function closeMenuOnClickOutside(event) {
+        const menuList = document.getElementById("menuList");
+        const menuBtn = document.querySelector(".menu-btn");
+        if (!menuList.contains(event.target) && !menuBtn.contains(event.target)) {
+          const menuItems = document.querySelectorAll(".menu-list li");
+          menuItems.forEach(item => {
+            if (item.classList.contains("visible")) {
+              item.classList.remove("visible");
+            }
+          });
+        }
+      }
+
+      document.addEventListener("click", closeMenuOnClickOutside);
+
+      function toggleMenu() {
+        const menuItems = document.querySelectorAll(".menu-list li");
+        menuItems.forEach(item => item.classList.toggle("visible"));
+      }
 
       // ----------------------------------------------
 
@@ -390,18 +540,22 @@
         var videoPlayer = videojs("video");
         videoPlayer.play();
       }
+
       function pause() {
         var videoPlayer = videojs("video");
         videoPlayer.pause();
       }
+
       function mute() {
         var videoPlayer = videojs("video");
         videoPlayer.muted(true);
       }
+
       function unmute() {
         var videoPlayer = videojs("video");
         videoPlayer.muted(false);
       }
+
       function insert_song_signal(playing_id, order) {
         console.log(`指定播放順序，佇列ID：` + playing_id);
         $.ajax({
@@ -414,6 +568,7 @@
           }
         });
       }
+
       function favorite_song(playing_id) {
         console.log(`將歌曲加入收藏，佇列ID：` + playing_id);
         $.ajax({
@@ -482,6 +637,12 @@
         if (now_playing_id != 0) {
           unfavorite_song(now_playing_id);
         }
+      }
+
+      function pass() {
+        var videoPlayer = videojs("video");
+        var lengthOfVideo = videoPlayer.duration();
+        videoPlayer.currentTime(lengthOfVideo);
       }
 
       function cut() {
