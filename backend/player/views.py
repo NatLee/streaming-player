@@ -145,9 +145,11 @@ class NightbotOrder(APIView):
         if duration > 900:
             return Response("這歌怎麼能超過15分鐘！")
 
-        song, created = Playlist.objects.update_or_create(
-            song_name=song_name, url=webpage_url, duration=duration
-        )
+        try:
+            song = Playlist.objects.get(url=webpage_url)
+        except Playlist.DoesNotExist:
+            song = Playlist(song_name=song_name, url=webpage_url, duration=duration)
+            song.save()
 
         # 被ban的歌就不給點
         if song.block:
