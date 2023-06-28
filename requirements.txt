@@ -24,3 +24,7 @@ ipython # for debugging
 
 yt_dlp # for extracting redirect url from youtube
 
+# websocket
+channels 
+channels_redis
+daphne
