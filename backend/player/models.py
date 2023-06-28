@@ -14,10 +14,12 @@ class Playlist(models.Model):
     favorite = models.BooleanField("是否收藏", default=False)
     block = models.BooleanField("是否黑名單", default=False)
 
+    missing = models.BooleanField("是否原曲找不到", default=False)
+
     history = HistoricalRecords(table_name="playlist_history")
 
     def __str__(self):
-        return f"{self.song_name} - {self.duration//60} min(s)"
+        return f"[Playlist] {self.song_name} - {self.duration//60} min(s)"
 
     class Meta:
         db_table = "playlist"
@@ -33,7 +35,7 @@ class PlaylistOrderHistory(models.Model):
     autoplay = models.BooleanField("是否爲自動點播", default=False)
 
     def __str__(self):
-        return f"{self.playlist} - {self.user}"
+        return f"[History] {self.playlist} - {self.user}"
 
     class Meta:
         db_table = "playlist_order_history"
@@ -48,7 +50,8 @@ class PlaylistOrderQueue(models.Model):
     order = models.SmallIntegerField("播放順序（越大越晚播）", default=0)
 
     def __str__(self):
-        return f"{self.order}"
+        # Queue #0 是拿來偵錯用的
+        return f"[Queue][{self.order}] - {self.playlist_order}"
 
     def to_dict(self):
         return {

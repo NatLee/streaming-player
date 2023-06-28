@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <title>Player</title>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -767,7 +768,7 @@
         videoPlayer.volume(volume);
       }
 
-      function get_video_url_and_play(videoPlayer, url, new_id, user, song_name) {
+      function get_video_url_and_play(videoPlayer, url, new_id, user) {
         $.ajax({
           type: "GET",
           headers: get_auth_headers(),
@@ -794,6 +795,22 @@
         });
       }
 
+      function set_video_url_and_play(videoPlayer, video_url, title, duration, url, new_id, user) {
+        now_playing_id = new_id;
+        videoPlayer.src({
+          type: "video/mp4",
+          src: video_url,
+        });
+        $("#user").text(user);
+        $("#title").text(title);
+        $("#url").text(url);
+        $("#duration").text(duration);
+        console.log("已設定此歌曲的播放網址");
+        // 更新底下播放清單
+        load_song_list();
+        console.log(`------------------------------------`);
+      }
+
       function set_playlist(videoPlayer) {
         $.ajax({
           type: "GET",
@@ -803,13 +820,18 @@
           success: function (playlist) {
             if (playlist.length === 0) {
               console.log(`------------------------------------`);
-              console.log(`播放清單已經爲空！`);
+              console.log(`播放清單已經爲空，請重新整理！`);
               console.log(`------------------------------------`);
+              change_player_src();
               return;
             }
       
-            const { id: new_id, user, in_queue, song_name, url } = playlist[0];
-      
+            const { id: new_id, user, in_queue, song_name, url, video } = playlist[0];
+
+            var video_url = video.video_url;
+            var title = video.title;
+            var duration = video.duration;
+
             console.log(`------------------------------------`);
             console.log(`播放器音量： ${videoPlayer.volume()}`);
             console.log(`點播者： ${user}`);
@@ -817,9 +839,10 @@
             console.log(`URL： ${url}`);
             console.log(`此ID是否於佇列中（自動點播爲False）： ${in_queue}`);
             console.log(`播放ID轉換： ${now_playing_id} -> ${new_id}`);
+            console.log(`Video URL： ${video_url}`);
             console.log(`------------------------------------`);
       
-            get_video_url_and_play(videoPlayer, url, new_id, user, song_name);
+            set_video_url_and_play(videoPlayer, video_url, title, duration, url, new_id, user);
       
           },
           error: function (err) {

@@ -1,5 +1,7 @@
 import datetime
 from django.contrib import admin
+from django.utils.html import format_html
+
 from rangefilter.filters import DateRangeFilter, DateTimeRangeFilter, NumericRangeFilter
 
 from simple_history.admin import SimpleHistoryAdmin
@@ -17,20 +19,27 @@ class PlaylistAdmin(SimpleHistoryAdmin):
         "id",
         "song_name",
         "url",
+        "video_link",
         "duration",
         "favorite",
         "block",
+        "missing",
         "last_played_at",
         "created_at",
     )
     list_filter = (
         "favorite",
         "block",
+        "missing",
     )
     search_fields = ["song_name", "url"]
 
     def get_rangefilter_created_at_default(self, request):
         return (get_last_week, datetime.date.today)
+
+    def video_link(self, obj):
+        return format_html('<a href="{}" target="_blank">Link</a>', obj.url)
+    video_link.short_description = 'Video Link'
 
 
 @admin.register(PlaylistOrderHistory)

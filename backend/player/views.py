@@ -17,16 +17,19 @@ from player.models import Playlist, PlaylistOrderHistory, PlaylistOrderQueue
 
 from player.utils.get_youtube_video_info import get_youtube_video_info
 
+from yt_dlp.utils import DownloadError
+
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 def dashboard(request):
     # 播放器前端本體
     # template path
     return render(request, "index.html")
 
+def login(request):
+    return render(request, "login.html")
 
 def reorder_playlist() -> int:
     count = 0
@@ -37,7 +40,6 @@ def reorder_playlist() -> int:
             obj.save()
             count += 1
     return count
-
 
 class YoutubeVideoInfo(APIView):
     permission_classes = (IsAuthenticated,)
@@ -76,7 +78,7 @@ class YoutubeVideoInfo(APIView):
         try:
             result = get_youtube_video_info(url)
         except Exception as e:
-            return Response({"status": "failed", "description": "獲取Youtube Video URL失敗 -> {e}"})
+            return Response({"status": "failed", "description": f"獲取 Youtube Video 的播放 URL 失敗 -> `{e}`"})
 
         return Response(result)
 
@@ -461,15 +463,24 @@ class GetSongFromPlaylistQueue(APIView):
         msg = ""
 
         with transaction.atomic():
-            result = PlaylistOrderQueue.objects.order_by("order")
-            if result:
-                result = result.first().to_dict()
+            result_objs = PlaylistOrderQueue.objects.order_by("order")
+            if result_objs:
+                result_obj = result_objs.first()
+                result = result_obj.to_dict()
+                url = result["url"]
                 msg += f'ID：{result["id"]}\n'
                 msg += f'取得佇列歌曲：{result["song_name"]}\n'
-                msg += f'URL：{result["url"]}\n'
+                msg += f'URL：{url}\n'
                 msg += "---------------------------------------------\n"
                 result["in_queue"] = True
-                results.append(result)
+                try:
+                    result['video'] = get_youtube_video_info(url)
+                    results.append(result)
+                except DownloadError:
+                    msg += '這首歌抓取發生問題！可能是不見了！'
+                    result_obj.playlist_order.playlist.missing = True
+                    result_obj.playlist_order.playlist.save()
+                    result_obj.playlist_order.delete()
             else:
                 msg += "---------------------------------------------\n"
                 msg += "佇列中沒有任何歌曲，故從已知歌曲列表隨機播放\n"
@@ -483,19 +494,30 @@ class GetSongFromPlaylistQueue(APIView):
                     )
                     # 佇列中沒有任何歌曲，但還是把order設定爲總數+1，也就是0+1
                     now_order = PlaylistOrderQueue.objects.count()
-                    result = PlaylistOrderQueue.objects.create(
+                    result_obj = PlaylistOrderQueue.objects.create(
                         playlist_order=poh, order=now_order + 1
                     )
-                    result = result.to_dict()
+                    result = result_obj.to_dict()
+                    url = result["url"]
                     msg += f'ID：{result["id"]}\n'
                     msg += f'隨機選播歌曲：{result["song_name"]}\n'
                     msg += f'URL：{result["url"]}\n'
                     msg += "---------------------------------------------\n"
                     result["in_queue"] = False
-                    results.append(result)
-                except:
-                    # 找不到任何歌曲
-                    pass
+                    try:
+                        result['video'] = get_youtube_video_info(url)
+                        results.append(result)
+                    except DownloadError:
+                        msg += '這首歌抓取發生問題！可能是不見了！'
+                        result_obj.playlist_order.playlist.missing = True
+                        result_obj.playlist_order.playlist.save()
+                        result_obj.playlist_order.delete()
+                except PlaylistOrderQueue.DoesNotExist as e:
+                    msg += "找不到任何歌曲！\n"
+                    msg += f'{e}\n'
+                except Exception as e:
+                    msg += "不預期的錯誤發生！\n"
+                    msg += f'{e}\n'
         print(msg)
         return Response(results)
 
@@ -639,6 +661,14 @@ class MarkSongAttribute(APIView):
                 value=False,
             ),
             openapi.Parameter(
+                name="missing",
+                in_=openapi.IN_QUERY,
+                description="是否歌曲丟失",
+                type=openapi.TYPE_BOOLEAN,
+                required=False,
+                value=False,
+            ),
+            openapi.Parameter(
                 name="delete",
                 in_=openapi.IN_QUERY,
                 description="是否從佇列中移除",
@@ -649,110 +679,82 @@ class MarkSongAttribute(APIView):
         ],
     )
     def get(self, request, get_id):
-
+        # Fetch playlist queue with the provided id
         queryset = PlaylistOrderQueue.objects.filter(pk=get_id)
         if not queryset:
             return Response({"status": "failed", "description": "這個ID已經不存在於佇列中"})
         result = queryset.first()
 
+        # Mapping of boolean strings to Python booleans
         tf_map = {
             "true": True,
             "false": False,
         }
 
-        # --------------------------------------------------------
-        # 檢查是否需要從佇列中移除，預設是不移除
+        # Fetch boolean parameters from the query parameters, defaulting to the current value if not provided
+        # Also defaults to False if the query parameter is missing and the attribute doesn't exist on the object
         delete = tf_map.get(request.GET.get("delete"), False)
-        # --------------------------------------------------------
-        # 檢查是否有被播的屬性
-        in_coming_played = tf_map.get(request.GET.get("played"), None)
-        old_played = result.playlist_order.played
-        # 如果沒有指定是否播過，則使用當前屬性
-        in_coming_played = old_played if in_coming_played is None else in_coming_played
-        # 檢查是否有被卡的屬性
-        in_coming_cut = tf_map.get(request.GET.get("cut"), None)
-        old_cut = result.playlist_order.cut
-        # 如果沒有指定是否卡歌，則使用當前屬性
-        in_coming_cut = old_cut if in_coming_cut is None else in_coming_cut
+        in_coming_played = tf_map.get(request.GET.get("played"), getattr(result.playlist_order, 'played', False))
+        in_coming_cut = tf_map.get(request.GET.get("cut"), getattr(result.playlist_order, 'cut', False))
+        in_coming_favorite = tf_map.get(request.GET.get("favorite"), getattr(result.playlist_order.playlist, 'favorite', False))
+        in_coming_block = tf_map.get(request.GET.get("block"), getattr(result.playlist_order.playlist, 'block', False))
+        in_coming_missing = tf_map.get(request.GET.get("missing"), getattr(result.playlist_order.playlist, 'missing', False))
 
-        if not isinstance(in_coming_played, bool) or not isinstance(
-            in_coming_cut, bool
-        ):
+        # Check that all provided parameters are valid booleans
+        if not all(isinstance(param, bool) for param in [in_coming_played, in_coming_cut, in_coming_favorite, in_coming_block, in_coming_missing]):
             return Response(
                 {
                     "status": "failed",
-                    "description": f"`played` or `cut` need to be boolean -> [{in_coming_played}][{in_coming_cut}]",
+                    "description": "All parameters (`played`, `cut`, `favorite`, `block`, `missing`) need to be boolean",
                 }
             )
 
-        # --------------------------------------------------------
-        # 檢查是否收藏或是是否需要加入黑名單的屬性
-        in_coming_favorite = tf_map.get(request.GET.get("favorite"), None)
-        old_favorite = result.playlist_order.playlist.favorite
-        # 如果沒有指定是否收藏，則使用當前屬性
-        in_coming_favorite = (
-            old_favorite if in_coming_favorite is None else in_coming_favorite
-        )
-
-        in_coming_block = tf_map.get(request.GET.get("block"), None)
-        old_block = result.playlist_order.playlist.block
-        # 如果沒有指定是否加入黑名單，則使用當前屬性
-        in_coming_block = old_block if in_coming_block is None else in_coming_block
-
-        if not isinstance(in_coming_favorite, bool) or not isinstance(
-            in_coming_block, bool
-        ):
-            return Response(
-                {
-                    "status": "failed",
-                    "description": f"`favorite` or `block` need to be boolean -> [{in_coming_favorite}][{in_coming_block}]",
-                }
-            )
-
-        # --------------------------------------------------------
-
-        msg = ""
-
-        msg += "------------------------------------------\n"
+        msg = "------------------------------------------\n"
         msg += "播放狀態改變\n"
         msg += f"[{get_id}] {result.playlist_order.user} 點的『{result.playlist_order.playlist.song_name}』\n"
         msg += "------------------------------------------\n"
 
-        # 調整屬性並儲存
+        # Modify attributes and save changes
         with transaction.atomic():
-            # 是否播放完
-            if old_played != in_coming_played:
+            # If the `played` attribute has changed, update it
+            if result.playlist_order.played != in_coming_played:
                 result.playlist_order.played = in_coming_played
-            msg += f"> Play: {old_played} -> {in_coming_played}\n"
-            # 是否被切歌
-            if old_cut != in_coming_cut:
+            msg += f"> Play: {result.playlist_order.played} -> {in_coming_played}\n"
+
+            # If the `cut` attribute has changed, update it
+            if result.playlist_order.cut != in_coming_cut:
                 result.playlist_order.cut = in_coming_cut
-            msg += f"> Cut: {old_cut} -> {in_coming_cut}\n"
+            msg += f"> Cut: {result.playlist_order.cut} -> {in_coming_cut}\n"
             result.playlist_order.save()
-            # 是否收藏
-            if old_favorite != in_coming_favorite:
+
+            # If the `favorite` attribute has changed, update it
+            if result.playlist_order.playlist.favorite != in_coming_favorite:
                 result.playlist_order.playlist.favorite = in_coming_favorite
-            msg += f"> Favorite: {old_favorite} -> {in_coming_favorite}\n"
-            # 是否加黑名單
-            if old_block != in_coming_block:
-                result.playlist_order.playlist.block = in_coming_block
-            msg += f"> Block: {old_block} -> {in_coming_block}\n"
+            msg += f"> Favorite: {result.playlist_order.playlist.favorite} -> {in_coming_favorite}\n"
+
+            # If the `missing` attribute has changed, update it
+            if result.playlist_order.playlist.missing != in_coming_missing:
+                result.playlist_order.playlist.missing = in_coming_missing
+            msg += f"> Missing: {result.playlist_order.playlist.missing} -> {in_coming_missing}\n"
             result.playlist_order.playlist.save()
-            # 是否從佇列移除
+
+            # If the `block` attribute has changed, update it
+            if result.playlist_order.playlist.block != in_coming_block:
+                result.playlist_order.playlist.block = in_coming_block
+            msg += f"> Block: {result.playlist_order.playlist.block} -> {in_coming_block}\n"
+
+            # If the `delete` flag is set, remove the item from the playlist queue
             if delete:
                 result.delete()
                 msg += f"點播佇列中ID爲[{get_id}]的項目已經從佇列移除！\n"
-                # 移除後，重新指定當前播放順序（最優先爲1）
                 reorder_playlist()
 
-        msg += "------------------------------------------\n"
         print(msg)
 
+        description = f"點播佇列中ID爲[{get_id}]的狀態已改變"
         if delete:
-            return Response(
-                {"status": "ok", "description": f"點播佇列中ID爲[{get_id}]的狀態已改變並已從佇列中移除"}
-            )
+            description += '，並已從佇列中移除'
 
-        return Response({"status": "ok", "description": f"點播佇列中ID爲[{get_id}]的狀態已改變"})
+        return Response({"status": "ok", "description": description})
 
 
