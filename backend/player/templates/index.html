@@ -304,7 +304,7 @@
     <ul class="menu-list" id="menuList">
       <li class="hidden">
         <div class="menu-item">
-          <h3 class="section-title">JWT Login</h3>
+          <h3 class="section-title">Login</h3>
           <div id="token" class="section-content"></div>
           <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
           <button class="menu-item-btn" onclick="logout()">Logout</button>
@@ -312,9 +312,7 @@
       </li>
       <li class="hidden">
         <div class="menu-item">
-          <h3 class="section-title">Session Login</h3>
-          <button class="menu-item-btn" onclick="javascript:location.href='/api/__hidden_admin/'">Login</button>
-          <button class="menu-item-btn" onclick="javascript:location.href='/api/__hidden_admin/logout/'">Logout</button>
+          <button class="menu-item-btn" onclick="javascript:location.href='/api/__hidden_admin/'">Admin</button>
         </div>
       </li>
     </ul>
@@ -453,8 +451,7 @@
       function logout() {
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("access_token");
-        location.href = "/player/";
-        location.reload();
+        location.replace('/player/login')
       }
 
 
@@ -480,6 +477,7 @@
         const msg = `JWT ${errorType} Error: ` + data.responseText;
         console.log(msg);
         $("#token").text(msg).css("color", "red");
+        location.replace('/player/login')
       }
       
       function jwt_refresh_and_verify() {
@@ -518,6 +516,7 @@
           const msg = "Have not login with JWT token!";
           $("#token").text(msg).css("color", "red");
           console.log(msg);
+          location.replace('/player/login')
         }
         console.log("----------------------------");
       }

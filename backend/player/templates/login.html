@@ -1,0 +1,196 @@
+<html>
+<head>
+    <title>Player Login</title>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="#" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.1.1/css/fontawesome.min.css" />
+
+    <style>
+        @keyframes gradientBG {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-size: 200% 200%;
+            background-image: linear-gradient(45deg, #1a2a6c, #b21f1f, #fdbb2d);
+            animation: gradientBG 10s ease infinite;
+        }
+        
+        .container {
+            width: 80%;
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: rgba(255,255,255, 0.8); /* semi-transparent white */
+            box-shadow: 0 0 15px rgba(0,0,0,0.2); /* soft shadow */
+            text-align: center; /* center text */
+        }
+
+        .inner-container {
+            display: flex;
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: rgba(255,128,128, 0.4); /* semi-transparent white */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container h3 {
+            animation: fadein 2s;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 2.5em;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px #000000;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes fadein {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #e60073, 0 0 40px #e60073;
+            }
+            to {
+                text-shadow: 0 0 20px #fff, 0 0 30px #ff4da6, 0 0 40px #ff4da6, 0 0 50px #ff4da6, 0 0 60px #ff4da6;
+            }
+        }
+    </style>
+
+    <meta name="google-signin-scope" content="profile email">
+    <meta name="google-signin-client_id" content="376808175534-d6mefo6b1kqih3grjjose2euree2g3cs.apps.googleusercontent.com">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <div id="g_id_onload" data-client_id="376808175534-d6mefo6b1kqih3grjjose2euree2g3cs.apps.googleusercontent.com" data-callback="get_jwt_using_google_credential" data-auto_prompt="false" />
+</head>
+
+<body>
+
+<div class="container">
+    <h3 class="section-title">Player</h3>
+    <div class="inner-container">
+        <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-2.1.1.min.js" type="text/javascript"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+
+<script>
+    // ----------------------------------------------
+
+    // 3rd-party login
+
+    function get_jwt_using_google_credential(data) {
+        $.post("/api/auth/google/token", {credential: data.credential}, function(response) {
+            localStorage.setItem("access_token", response.access_token);
+            localStorage.setItem("refresh_token", response.refresh_token);
+            console.log("Google Login");
+        
+            $.ajax({
+            type: "POST",
+            url: "/api/auth/token/verify",
+            data: {token: response.access_token},
+            headers: {
+                "Authorization": "Bearer " + response.access_token
+            },
+            success: function(data) {
+                console.log(data);
+                location.replace('/player/')
+            },
+            error: function(data) {
+                console.log(data);
+                Swal.fire({ icon: 'question', title: 'Error', text: data });
+            }
+            });
+        });
+    }
+
+
+    // ----------------------------------------------
+
+    // JWT
+
+    function get_jwt_token_and_refresh() {
+        return {
+            token: localStorage.getItem("access_token"),
+            refresh: localStorage.getItem("refresh_token")
+        };
+    }
+    
+    function get_auth_headers() {
+        return {
+            Authorization: "Bearer " + get_jwt_token_and_refresh().token
+        };
+    }
+    
+    function handle_jwt_error(data, errorType) {
+    Swal.fire({ icon: 'error', title: `JWT ${errorType} Error`, text: data.responseText });
+    const msg = `JWT ${errorType} Error: ` + data.responseText;
+    console.log(msg);
+    }
+    
+    function jwt_refresh_and_verify() {
+    console.log("--- JWT Refresh and Verify ---");
+    const { token, refresh } = get_jwt_token_and_refresh();
+    
+    if (token) {
+        $.ajax({
+        type: "POST",
+        url: "/api/auth/token/refresh",
+        data: { refresh },
+        success(data) {
+            localStorage.setItem("token", data.access_token);
+            const jwt_token = data.access_token;
+            $.ajax({
+            type: "POST",
+            url: "/api/auth/token/verify",
+            data: { token: jwt_token },
+            headers: { Authorization: "Bearer " + jwt_token },
+            success(data) {
+                const msg = "Login with JWT token!";
+                console.log(msg);
+                location.replace('/player/')
+            },
+            error(data) {
+                handle_jwt_error(data, 'Verify');
+            }
+            });
+        },
+        error(data) {
+            handle_jwt_error(data, 'Refresh');
+        }
+        });
+    } else {
+        const msg = "Have not login with JWT token!";
+        console.log(msg);
+    }
+    console.log("----------------------------");
+    }
+
+    // ----------------------------------------------
+
+</script>
+
+</html>
