@@ -414,6 +414,8 @@ class NightbotUserPollRemoveNowPlayingSong(APIView):
 
         if len(song_poll_users) >= cut_over_num:
             msg = f'當前的歌 [{song_name}] 已經被 [{user_string}] 投票卡掉！'
+            song_in_queue.playlist_order.cut = True
+            song_in_queue.playlist_order.save()
             song_in_queue.delete()
             cache.delete(cache_key)
         return Response(msg)
@@ -589,7 +591,7 @@ class GetSongFromPlaylistQueue(APIView):
         return Response(results)
 
 class ShowSongInPlaylistQueue(APIView):
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (AllowAny,)
 
     @swagger_auto_schema(
         operation_summary="GET",

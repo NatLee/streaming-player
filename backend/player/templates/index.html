@@ -661,10 +661,23 @@
           success(queue) {
             const html = render_song_list(queue);
             document.getElementById("songlist").innerHTML = html;
+            if (queue.length === 0) {
+              console.log("Queue is empty");
+              cut();
+            }else {
+              var first_song_id = queue[0].id; // Assuming that each song in the queue has an 'id' field
+              // Assuming 'now_playing_id' is a global variable
+              if (now_playing_id !== first_song_id) {
+                  console.log("The currently playing song does not exist in the queue");
+                  cut();
+              } else {
+                  console.log("The currently playing song exists in the top of the queue");
+              }
+            }
           }
         });
       }
-      
+
       function insert_song_to_top(playing_id) {
         console.log(`指定播放順序，佇列ID：` + playing_id);
         $.ajax({
@@ -899,30 +912,25 @@
       // -------------------------
 
       // polling 區
-      // TODO 偵測當前投票數量是否卡歌（沒websocket的做法）
       var sleep = duration => new Promise(resolve => setTimeout(resolve, duration))
-      /*
-      var poll = (promiseFn, duration) => promiseFn().then(
+      var reload_song_list_and_detect = (promiseFn, duration) => promiseFn().then(
         sleep(duration).then(
-            () => poll(promiseFn, duration)
+            () => reload_song_list_and_detect(promiseFn, duration)
           )
       )
-      poll(() => new Promise(() => console.log('Hello World!')), 3000)
-      */
 
-      var reload_song_list = (promiseFn, duration) => promiseFn().then(
-        sleep(duration).then(
-            () => reload_song_list(promiseFn, duration)
-          )
-      )
+      // -------------------------
 
       $(document).ready(function () {
         $.when(jwt_refresh_and_verify()).then(function(){
-            reload_song_list(
+            reload_song_list_and_detect(
               () => new Promise(
                 () => {
-                  console.log('Reloading song list!');
-                  load_song_list();
+                  var videoPlayer = videojs("video");
+                  if (videoPlayer.readyState() > 0) {
+                    console.log('Reloading song list and detect first song!');
+                    var queue = load_song_list();
+                  }
                 }
               ), 5000
             );
