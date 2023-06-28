@@ -21,7 +21,7 @@ SITE_ID = 1
 
 # ----------------------------- START - DEBUG setting -------------------------------
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 print(f"---------- Debug mode: {DEBUG}")
 # ------------------------------ END - DEBUG setting --------------------------------
 
@@ -55,6 +55,10 @@ VALID_REGISTER_DOMAINS = ["gmail.com"]
 INSTALLED_APPS = [
     # admin UI
     "jazzmin",
+    # websocket
+    "daphne",
+    "channels",
+    "channels_redis",
     # django
     "django.contrib.admin",
     "django.contrib.auth",
@@ -80,6 +84,16 @@ INSTALLED_APPS = [
     # test
     "ping",
 ]
+
+ASGI_APPLICATION = "backend.asgi.application"
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("player-backend-redis", 6379)],
+        },
+    },
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

@@ -636,12 +636,12 @@
 
       function cut() {
         cut_song_signal();
-        location.reload();
+        pass();
       }
 
       function cut_and_block() {
         cut_and_block_song_signal();
-        location.reload();
+        pass();
       }
 
       function favorite() {
@@ -661,19 +661,6 @@
           success(queue) {
             const html = render_song_list(queue);
             document.getElementById("songlist").innerHTML = html;
-            if (queue.length === 0) {
-              console.log("Queue is empty");
-              cut();
-            }else {
-              var first_song_id = queue[0].id; // Assuming that each song in the queue has an 'id' field
-              // Assuming 'now_playing_id' is a global variable
-              if (now_playing_id !== first_song_id) {
-                  console.log("The currently playing song does not exist in the queue");
-                  cut();
-              } else {
-                  console.log("The currently playing song exists in the top of the queue");
-              }
-            }
           }
         });
       }
@@ -911,29 +898,77 @@
 
       // -------------------------
 
-      // polling 區
-      var sleep = duration => new Promise(resolve => setTimeout(resolve, duration))
-      var reload_song_list_and_detect = (promiseFn, duration) => promiseFn().then(
-        sleep(duration).then(
-            () => reload_song_list_and_detect(promiseFn, duration)
-          )
-      )
+      // websocket
+
+      function getWebSocketPath() {
+        var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        var host = window.location.host;
+        return protocol + '//' + host + '/ws/player/';
+      }
+
+      // Connection settings
+      var RECONNECT_INTERVAL = 3000;
+      var WS_URL = getWebSocketPath();
+
+      // Initial connection
+      var socket = new WebSocket(WS_URL);
+
+      // Reconnect function
+      function reconnect() {
+        console.log('WebSocket reconnecting...');
+        socket = new WebSocket(WS_URL);
+        setEventHandlers();
+      }
+
+      // Set WebSocket event handlers
+      function setEventHandlers() {
+        socket.onopen = function() {
+            console.log('WebSocket connected');
+        };
+
+        socket.onclose = function(event) {
+            console.log('WebSocket closed', event);
+            setTimeout(reconnect, RECONNECT_INTERVAL);
+        };
+
+        socket.onerror = function(error) {
+            console.log('WebSocket error', error);
+        };
+
+        socket.onmessage = function(event) {
+            // handle incoming messages
+            var decoded_data = event.data.replace(/\\u(....)/gi, function(m,v){
+              return String.fromCharCode(parseInt(v,16));
+            })
+            var data = JSON.parse(decoded_data);
+            var action = data.action;
+            console.log('Websocket Received: ', data.message);
+            console.log('Action Received: ', action);
+            if(action==='cut'){
+              // 投票通過卡歌
+              cut();
+            }
+            if(action==='order'){
+              // 有人點歌
+              load_song_list();
+            }
+        };
+      }
+
+      // Example function to send data
+      function sendData(data) {
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(data);
+        } else {
+            console.log('Cannot send message, WebSocket is not open');
+        }
+      }
 
       // -------------------------
 
       $(document).ready(function () {
+        setEventHandlers();
         $.when(jwt_refresh_and_verify()).then(function(){
-            reload_song_list_and_detect(
-              () => new Promise(
-                () => {
-                  var videoPlayer = videojs("video");
-                  if (videoPlayer.readyState() > 0) {
-                    console.log('Reloading song list and detect first song!');
-                    var queue = load_song_list();
-                  }
-                }
-              ), 5000
-            );
             change_player_src();
           }
         )

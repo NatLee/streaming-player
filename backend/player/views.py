@@ -12,6 +12,9 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
 from common.helperfunc import api_response
 
 from player.models import Playlist, PlaylistOrderHistory, PlaylistOrderQueue
@@ -194,9 +197,19 @@ class NightbotOrder(APIView):
         else:
             time_hint = f"{hours}時{minutes}分{seconds}秒"
 
-        return Response(
-            f"{user} 無情點播了『{song.song_name}』，播放順位是#{order+1}，還要再等{time_hint}！"
+        msg = f"{user} 無情點播了『{song.song_name}』，播放順位是#{order+1}，還要再等{time_hint}！"
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            'player',  # This matches the name of the group in the consumer
+            {
+                'type': 'song.order',
+                'message': msg
+            }
         )
+
+
+        return Response(msg)
 
 class NightbotDeleteFromQueue(APIView):
     permission_classes = (AllowAny,)
@@ -392,16 +405,12 @@ class NightbotUserPollRemoveNowPlayingSong(APIView):
             return Response("天啊！沒有人！")
 
         try:
-            song_in_queue = PlaylistOrderQueue.objects.first()
+            song_in_queue = PlaylistOrderQueue.objects.order_by('order').first()
         except PlaylistOrderQueue.DoesNotExist:
             return Response(f"{user}，天啊！現在剛好沒歌！")
 
         if not song_in_queue:
             return Response(f"{user}，天啊！這首歌已經沒了！")
-
-        order = song_in_queue.order
-        if order != 1:
-            return Response(f"{user}，天啊！這首剛好播完！")
 
         cache_key = f'poll-{song_in_queue.pk}'
         song_poll_users = cache.get(cache_key, [])
@@ -413,14 +422,25 @@ class NightbotUserPollRemoveNowPlayingSong(APIView):
         song_name = song_in_queue.playlist_order.playlist.song_name
         user_string = " , ".join(song_poll_users)
 
-        msg = f'[{user_string}] 投票要卡掉當前的歌 [{song_name}]，達成人數 [{len(song_poll_users)}/{cut_over_num}]'
+        msg = f'[ {user_string} ] 投票要卡掉當前的歌 [{song_name}]，達成人數 [{len(song_poll_users)}/{cut_over_num}]'
 
         if len(song_poll_users) >= cut_over_num:
-            msg = f'當前的歌 [{song_name}] 已經被 [{user_string}] 投票卡掉！'
+            msg = f'當前的歌 [{song_name}] 已經被 [ {user_string} ] 投票卡掉！'
             song_in_queue.playlist_order.cut = True
             song_in_queue.playlist_order.save()
             song_in_queue.delete()
             cache.delete(cache_key)
+
+            # Notify the frontend about the song cut
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'player',  # This matches the name of the group in the consumer
+                {
+                    'type': 'song.cut',
+                    'message': msg
+                }
+            )
+
         return Response(msg)
 
 class InsertSongInPlaylistQueue(APIView):
