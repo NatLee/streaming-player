@@ -10,6 +10,8 @@ doc
 
 .vscode
 
+000*_*.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
