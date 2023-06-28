@@ -250,7 +250,10 @@ class NightbotDeleteFromQueue(APIView):
             return Response(f"{user}要砍歌請 -> https://www.youtube.com/watch?v=<輸入這邊的ID>")
 
         try:
-            song_in_queue = PlaylistOrderQueue.objects.get(playlist_order__user=user, playlist_order__playlist__url=f'https://www.youtube.com/watch?v={song_id}')
+            song_in_queue = PlaylistOrderQueue.objects.get(playlist_order__playlist__url=f'https://www.youtube.com/watch?v={song_id}')
+            request_user = song_in_queue.playlist_order.user
+            if request_user != user:
+                return Response(f"{user}，不要砍別人點的歌！這首是 {request_user} 點的")
         except PlaylistOrderQueue.DoesNotExist:
             return Response(f"{user}，現在的佇列沒有這首歌啊！")
 
