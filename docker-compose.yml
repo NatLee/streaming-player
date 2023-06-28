@@ -16,6 +16,13 @@ services:
     networks:
       - player-backend-service-net
 
+  player-backend-redis:
+    container_name: player-backend-redis
+    image: redis:latest
+    restart: always
+    networks:
+      - player-backend-service-net
+
 networks:
   player-backend-service-net:
     driver: bridge
