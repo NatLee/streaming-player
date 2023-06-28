@@ -1,6 +1,7 @@
 import random
 from collections import Counter
 
+from django.core.cache import cache
 from django.shortcuts import render
 from django.db import transaction
 from django.db.models import Sum
@@ -350,6 +351,72 @@ class NightbotUserCountRecord(APIView):
         return Response(
             f"{user} 點歌次數有 {total_number} 次，播完的比例有 {percent:.2f} %，總共 {duration_str}，不重複的歌有 {unique_number} 首，最常點播的歌是 [{most_song_name}] ，高達 {most_count} 次"
         )
+
+class NightbotUserPollRemoveNowPlayingSong(APIView):
+    permission_classes = (AllowAny,)
+
+    @swagger_auto_schema(
+        operation_summary="GET",
+        operation_description="Polls to remove the now playing song from the queue using cache if polled by at least 3 users",
+        responses={
+            "200": openapi.Response(
+                description="message",
+                examples={
+                    "application/json": {
+                        "result": [],
+                        "code": 0,
+                    }
+                },
+            )
+        },
+        manual_parameters=[
+            openapi.Parameter(
+                name="user",
+                in_=openapi.IN_QUERY,
+                description="投票人",
+                type=openapi.TYPE_STRING,
+                required=True,
+                value="nightbot",
+            ),
+        ],
+    )
+    def get(self, request):
+
+        cut_over_num = 3
+        user = request.query_params.get("user", None)
+
+        if user is None:
+            return Response("天啊！沒有人！")
+
+        try:
+            song_in_queue = PlaylistOrderQueue.objects.first()
+        except PlaylistOrderQueue.DoesNotExist:
+            return Response(f"{user}，天啊！現在剛好沒歌！")
+
+        if not song_in_queue:
+            return Response(f"{user}，天啊！這首歌已經沒了！")
+
+        order = song_in_queue.order
+        if order != 1:
+            return Response(f"{user}，天啊！這首剛好播完！")
+
+        cache_key = f'poll-{song_in_queue.pk}'
+        song_poll_users = cache.get(cache_key, [])
+        if user in song_poll_users:
+            return Response(f"{user}，天啊！不要重複投票好嗎！")
+        song_poll_users.append(user)
+        cache.set(cache_key, song_poll_users, 15 * 60)
+
+        song_name = song_in_queue.playlist_order.playlist.song_name
+        user_string = " , ".join(song_poll_users)
+
+        msg = f'[{user_string}] 投票要卡掉當前的歌 [{song_name}]，達成人數 [{len(song_poll_users)}/{cut_over_num}]'
+
+        if len(song_poll_users) >= cut_over_num:
+            msg = f'當前的歌 [{song_name}] 已經被 [{user_string}] 投票卡掉！'
+            song_in_queue.delete()
+            cache.delete(cache_key)
+        return Response(msg)
 
 class InsertSongInPlaylistQueue(APIView):
     permission_classes = (IsAuthenticated,)

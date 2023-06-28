@@ -34,6 +34,11 @@ urlpatterns = [
         name="nightbot_user_count_record",
     ),
     path(
+        "nightbot/current/poll",
+        views.NightbotUserPollRemoveNowPlayingSong.as_view(),
+        name="nightbot_user_poll_remove_playing_song",
+    ),
+    path(
         "playlist/get",
         views.GetSongFromPlaylistQueue.as_view(),
         name="get_song_from_playlist_queue",
