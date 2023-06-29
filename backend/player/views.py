@@ -161,6 +161,10 @@ class NightbotOrder(APIView):
         if song.block:
             return Response("Sorry! This song has been blocked ;/")
 
+        # 已經找不到的歌就不給點
+        if song.missing:
+            return Response("Sad! This song has lost :(")
+
         # 有人點過就不再存到佇列
         queue = PlaylistOrderQueue.objects.filter(
             playlist_order__playlist__url=webpage_url
