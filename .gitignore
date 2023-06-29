@@ -12,6 +12,8 @@ doc
 
 000*_*.py
 
+backend/staticfiles
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
