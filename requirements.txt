@@ -13,6 +13,8 @@ django-admin-rangefilter
 
 django-simpleui
 
+whitenoise==6.5.0 # staticfiles
+
 drf-yasg==1.21.4
 
 pyparsing==3.0.8
