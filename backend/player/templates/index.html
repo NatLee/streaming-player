@@ -821,7 +821,8 @@
               console.log(`------------------------------------`);
               console.log(`播放清單已經爲空，請重新整理！`);
               console.log(`------------------------------------`);
-              return;
+              // 直接重新整理去拿新歌
+              location.reload();
             }
       
             const { id: new_id, user, in_queue, song_name, url, video } = playlist[0];
