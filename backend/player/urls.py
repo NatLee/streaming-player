@@ -39,6 +39,11 @@ urlpatterns = [
         name="nightbot_user_poll_remove_playing_song",
     ),
     path(
+        "nightbot/<int:song_pk_in_queue>/insert",
+        views.NightbotUserPollInsertSongToTop.as_view(),
+        name="nightbot_user_poll_insert_song_to_top",
+    ),
+    path(
         "playlist/get",
         views.GetSongFromPlaylistQueue.as_view(),
         name="get_song_from_playlist_queue",

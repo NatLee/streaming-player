@@ -243,10 +243,10 @@ class NightbotDeleteFromQueue(APIView):
             openapi.Parameter(
                 name="song_id",
                 in_=openapi.IN_QUERY,
-                description="歌曲ID",
-                type=openapi.TYPE_STRING,
+                description="點歌的ID",
+                type=openapi.TYPE_INTEGER ,
                 required=True,
-                value="JJo-zUi9E5U",
+                value="12345",
             ),
         ],
     )
@@ -261,10 +261,10 @@ class NightbotDeleteFromQueue(APIView):
         print(f"{user} 使用 [{song_pk_in_queue}] 嘗試進行砍歌！")
 
         if not song_pk_in_queue:
-            return Response(f"哪有人砍歌不輸入ID的！ -> [{song_pk_in_queue}]")
+            return Response(f"哪有人砍歌不輸入ID的！")
 
         if not user:
-            return Response(f"記得要填使用者！ -> [{user}]")
+            return Response(f"記得要填使用者！")
 
         try:
             song_in_queue = PlaylistOrderQueue.objects.get(pk=song_pk_in_queue)
@@ -377,7 +377,7 @@ class NightbotUserPollRemoveNowPlayingSong(APIView):
 
     @swagger_auto_schema(
         operation_summary="GET",
-        operation_description="Polls to remove the now playing song from the queue using cache if polled by at least 3 users",
+        operation_description="投票砍掉當前播放的歌，大於一定人數可砍掉",
         responses={
             "200": openapi.Response(
                 description="message",
@@ -441,6 +441,116 @@ class NightbotUserPollRemoveNowPlayingSong(APIView):
                 'player',  # This matches the name of the group in the consumer
                 {
                     'type': 'song.cut',
+                    'message': msg
+                }
+            )
+
+        return Response(msg)
+
+class NightbotUserPollInsertSongToTop(APIView):
+    permission_classes = (AllowAny,)
+
+    @swagger_auto_schema(
+        operation_summary="GET",
+        operation_description="投票插歌，大於一定人數可插",
+        responses={
+            "200": openapi.Response(
+                description="message",
+                examples={
+                    "application/json": {
+                        "result": [],
+                        "code": 0,
+                    }
+                },
+            )
+        },
+        manual_parameters=[
+            openapi.Parameter(
+                name="user",
+                in_=openapi.IN_QUERY,
+                description="投票人",
+                type=openapi.TYPE_STRING,
+                required=True,
+                value="nightbot",
+            ),
+        ],
+    )
+    def get(self, request, song_pk_in_queue):
+
+        # ---------------------------------
+        insert_over_num = 2
+        order = 1
+        # ---------------------------------
+
+        user = request.query_params.get("user", None)
+
+        # 判斷是不是全數字
+        if not song_pk_in_queue.isdigit():
+            return Response(f"ID是點歌時會給的一組數字ㄛ！")
+
+        print(f"{user} 使用 [{song_pk_in_queue}] 嘗試進行投票插歌！")
+
+        if not song_pk_in_queue:
+            return Response(f"哪有人插歌不給ID的！")
+
+        if user is None:
+            return Response("天啊！是誰要投票插！")
+
+        try:
+            order_song_in_queue = PlaylistOrderQueue.objects.get(pk=song_pk_in_queue)
+        except PlaylistOrderQueue.DoesNotExist:
+            return Response("無法插歌！因爲這首已經不存在！")
+
+        order_song_in_queue_order = order_song_in_queue.order
+        new_order = order + 1
+        if order_song_in_queue_order <= new_order:
+            return Response(f"無法插歌！因爲這首已經是下一首了！")
+
+        # -----------------------------------
+        # cache for polling users
+        cache_key = f'poll-insert-{song_pk_in_queue}'
+        poll_users = cache.get(cache_key, [])
+        if user in poll_users:
+            return Response(f"{user}，天啊！不要重複投票插歌好嗎！")
+        poll_users.append(user)
+        cache.set(cache_key, poll_users, 15 * 60)
+        # -----------------------------------
+
+        song_name = order_song_in_queue.playlist_order.playlist.song_name
+        user_string = " , ".join(poll_users)
+
+        msg = f'[ {user_string} ] 投票要插歌 [{song_name}]，達成人數 [{len(poll_users)}/{insert_over_num}]'
+
+        if len(poll_users) >= insert_over_num:
+            msg = f'當前的歌 [{song_name}] 由 [ {user_string} ] 投票成功插歌！'
+
+            print(f"嘗試調換佇列中ID爲[{song_pk_in_queue}]的項目順序：{order_song_in_queue_order} -> {new_order}")
+
+            # 怕有操作導致歌曲順序出問題
+            # 先重新排列原本佇列
+            reorder_playlist()
+
+            with transaction.atomic():
+                # 取出佇列中播放順序大於指定位置的項目並把它們的順序都加一
+                for obj in (
+                    PlaylistOrderQueue.objects.filter(order__gt=order)
+                    .exclude(pk=song_pk_in_queue)
+                    .order_by("order")
+                ):
+                    obj.order += 1
+                    obj.save()
+                # 最後把目標設定到指定位置
+                order_song_in_queue.order = new_order
+                order_song_in_queue.save()
+
+            cache.delete(cache_key)
+
+            # Notify the frontend about the song cut
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'player',  # This matches the name of the group in the consumer
+                {
+                    'type': 'song.insert',
                     'message': msg
                 }
             )

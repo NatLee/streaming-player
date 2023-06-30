@@ -40,3 +40,14 @@ class PlayerConsumer(AsyncWebsocketConsumer):
                 }
             )
         )
+
+    async def song_insert(self, event):
+        message = event["message"]
+        await self.send(
+            text_data=json.dumps(
+                {
+                    'message': message,
+                    'action': 'insert'
+                }
+            )
+        )
