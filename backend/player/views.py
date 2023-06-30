@@ -240,22 +240,13 @@ class NightbotDeleteFromQueue(APIView):
                 required=True,
                 value="nightbot",
             ),
-            openapi.Parameter(
-                name="song_id",
-                in_=openapi.IN_QUERY,
-                description="點歌的ID",
-                type=openapi.TYPE_INTEGER ,
-                required=True,
-                value="12345",
-            ),
         ],
     )
-    def get(self, request):
+    def get(self, request, song_pk_in_queue):
         user = request.query_params.get("user", None)
-        song_pk_in_queue = request.query_params.get("song_id", None)
 
         # 判斷是不是全數字
-        if not song_pk_in_queue.isdigit():
+        if not str(song_pk_in_queue).isdigit():
             return Response(f"ID是點歌時會給的一組數字ㄛ！")
 
         print(f"{user} 使用 [{song_pk_in_queue}] 嘗試進行砍歌！")
@@ -485,7 +476,7 @@ class NightbotUserPollInsertSongToTop(APIView):
         user = request.query_params.get("user", None)
 
         # 判斷是不是全數字
-        if not song_pk_in_queue.isdigit():
+        if not str(song_pk_in_queue).isdigit():
             return Response(f"ID是點歌時會給的一組數字ㄛ！")
 
         print(f"{user} 使用 [{song_pk_in_queue}] 嘗試進行投票插歌！")
