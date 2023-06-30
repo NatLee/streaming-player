@@ -185,7 +185,7 @@ class NightbotOrder(APIView):
             total_seconds = PlaylistOrderQueue.objects.aggregate(
                 seconds=Sum("playlist_order__playlist__duration")
             )["seconds"]
-            PlaylistOrderQueue.objects.create(playlist_order=poh, order=order + 1)
+            new_order_song = PlaylistOrderQueue.objects.create(playlist_order=poh, order=order + 1)
 
         if total_seconds is None:
             return Response(
@@ -201,7 +201,7 @@ class NightbotOrder(APIView):
         else:
             time_hint = f"{hours}時{minutes}分{seconds}秒"
 
-        msg = f"{user} 無情點播了『{song.song_name}』，播放順位是#{order+1}，還要再等{time_hint}！"
+        msg = f"{user} 無情點播了『{song.song_name}』，播放順位是#{order+1}，ID是『{new_order_song.pk}』，還要再等{time_hint}！"
 
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
@@ -211,7 +211,6 @@ class NightbotOrder(APIView):
                 'message': msg
             }
         )
-
 
         return Response(msg)
 
@@ -253,21 +252,22 @@ class NightbotDeleteFromQueue(APIView):
     )
     def get(self, request):
         user = request.query_params.get("user", None)
-        song_id = request.query_params.get("song_id", None)
+        song_pk_in_queue = request.query_params.get("song_id", None)
 
-        print(f"{user} 使用 [{song_id}] 嘗試進行砍歌！")
+        # 判斷是不是全數字
+        if not song_pk_in_queue.isdigit():
+            return Response(f"ID是點歌時會給的一組數字ㄛ！")
 
-        if not song_id:
-            return Response(f"哪有人砍歌不輸入ID的！ -> [{song_id}]")
+        print(f"{user} 使用 [{song_pk_in_queue}] 嘗試進行砍歌！")
+
+        if not song_pk_in_queue:
+            return Response(f"哪有人砍歌不輸入ID的！ -> [{song_pk_in_queue}]")
 
         if not user:
             return Response(f"記得要填使用者！ -> [{user}]")
 
-        if 'http' in song_id or len(song_id) > 20:
-            return Response(f"{user}要砍歌請 -> https://www.youtube.com/watch?v=<輸入這邊的ID>")
-
         try:
-            song_in_queue = PlaylistOrderQueue.objects.get(playlist_order__playlist__url=f'https://www.youtube.com/watch?v={song_id}')
+            song_in_queue = PlaylistOrderQueue.objects.get(pk=song_pk_in_queue)
             request_user = song_in_queue.playlist_order.user
             if request_user != user:
                 return Response(f"{user}，不要砍別人點的歌！這首是 {request_user} 點的")
