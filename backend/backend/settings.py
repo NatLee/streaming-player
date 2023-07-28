@@ -1,3 +1,4 @@
+import sys
 import logging
 import os
 from pathlib import Path
@@ -198,52 +199,70 @@ STATIC_ROOT = "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # -------------- START - Log setting --------------
-LOG_ROOT = Path(BASE_DIR) / "logs"
+LOG_ROOT = Path(BASE_DIR) / 'logs'
 LOG_ROOT.mkdir(exist_ok=True)
 
+LOG_TYPES = ['file', 'database']
+for log_type in LOG_TYPES:
+    log_type_path = Path(BASE_DIR) / 'logs' / log_type
+    log_type_path.mkdir(exist_ok=True)
+
+HANDLERS = {}
+
+for log_type in LOG_TYPES:
+    HANDLERS[log_type] = {
+        'class': 'common.log.InterceptTimedRotatingFileHandler',
+        'filename': f"{LOG_ROOT / log_type/ f'{log_type}.log'}",
+        'when': "H",
+        'interval': 1,
+        'backupCount': 1,
+        'formatter': 'standard',
+        'encoding': 'utf-8',
+    }
+
+HANDLERS.update({
+    'console': {
+        'class': 'logging.StreamHandler',
+        'stream': sys.stdout
+    }
+})
+
 LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": True,
-    "formatters": {
+    'version': 1,
+    'disable_existing_loggers': True,
+    'formatters': {
         # LOG格式
-        "standard": {
-            "format": "[%(asctime)s] [%(filename)s:%(lineno)d] [%(module)s:%(funcName)s] [%(levelname)s] - %(message)s"
-        },
-        "simple": {"format": "%(levelname)s %(message)s"},  # 簡單格式
+        'standard': {
+            'format': '[%(asctime)s] [%(filename)s:%(lineno)d] [%(module)s:%(funcName)s] [%(levelname)s] - %(message)s'},
+        'simple': {  # 簡單格式
+            'format': '%(levelname)s %(message)s'
+        }
     },
-    "filters": {},
-    "handlers": {
-        "file": {
-            "class": "common.log.InterceptTimedRotatingFileHandler",
-            "filename": f"{LOG_ROOT / 'srap.log'}",
-            "when": "H",
-            "interval": 1,
-            "backupCount": 1,
-            "formatter": "standard",
-            "encoding": "utf-8",
-        },
-        "database": {
-            "class": "common.log.InterceptTimedRotatingFileHandler",
-            "filename": f"{LOG_ROOT / 'database.log'}",
-            "when": "H",
-            "interval": 1,
-            "backupCount": 1,
-            "formatter": "standard",
-            "encoding": "utf-8",
-        },
+    'filters': {
     },
-    "loggers": {
-        "django": {"handlers": ["file"], "propagate": True, "level": "INFO"},
-        "celery": {"handlers": ["file"], "propagate": False, "level": "INFO"},
-        """
+    'handlers': HANDLERS,
+    'loggers': {
+        'django': {
+            'handlers': ['file', 'console'],
+            'propagate': True,
+            'level': "INFO"
+        },
+        'celery': {
+            'handlers': ['file'],
+            'propagate': False,
+            'level': "INFO"
+        },
         'django.db.backends': {
             'handlers': ['database'],
             'propagate': False,
             'level': "DEBUG"
         },
-        """
-        "django.request": {"handlers": ["file"], "propagate": False, "level": "DEBUG"},
-    },
+        'django.request': {
+            'handlers': ['file'],
+            'propagate': False,
+            'level': "DEBUG"
+        }
+    }
 }
 
 # --------------- END - Log setting ---------------

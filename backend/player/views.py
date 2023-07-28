@@ -265,17 +265,27 @@ class NightbotDeleteFromQueue(APIView):
         except PlaylistOrderQueue.DoesNotExist:
             return Response(f"{user}，現在的佇列沒有這首歌啊！")
 
-        order = song_in_queue.order
-        if order == 1:
-            return Response(f"{user}，正在播的歌沒辦法刪除ㄛ！")
-
         with transaction.atomic():
+            order = song_in_queue.order
+
             history_order_obj = song_in_queue.playlist_order
             song_name = history_order_obj.playlist.song_name
             history_order_obj.delete()
-        return Response(
-            f"{user} 無情砍了 #{order} 『{song_name}』"
-        )
+
+            msg = f"{user} 無情砍了 #{order} 『{song_name}』"
+
+            if order == 1:
+                # Notify the frontend about the song cut
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    'player',  # This matches the name of the group in the consumer
+                    {
+                        'type': 'song.cut',
+                        'message': msg
+                    }
+                )
+
+        return Response(msg)
 
 class NightbotCurrentSongInQueue(APIView):
     permission_classes = (AllowAny,)
