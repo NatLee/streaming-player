@@ -27,6 +27,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+LIMIT_SONG_NUMBER = 30
+LIMIT_MINUTES = 15
+
 def dashboard(request):
     # 播放器前端本體
     # template path
@@ -136,7 +139,7 @@ class NightbotOrder(APIView):
 
         now_order = PlaylistOrderQueue.objects.count()
 
-        if now_order >= 30:
+        if now_order >= LIMIT_SONG_NUMBER:
             return Response("要播的歌太多了！再點我要罷工了！")
 
         try:
@@ -148,8 +151,8 @@ class NightbotOrder(APIView):
         duration = result.get("duration")
         webpage_url = result.get("webpage_url")
 
-        if duration > 900:
-            return Response("這歌怎麼能超過15分鐘！")
+        if duration > 60 * LIMIT_MINUTES:
+            return Response(f"這歌怎麼能超過{LIMIT_MINUTES}分鐘！")
 
         try:
             song = Playlist.objects.get(url=webpage_url)
@@ -422,7 +425,7 @@ class NightbotUserPollRemoveNowPlayingSong(APIView):
         if user in song_poll_users:
             return Response(f"{user}，天啊！不要重複投票好嗎！")
         song_poll_users.append(user)
-        cache.set(cache_key, song_poll_users, 15 * 60)
+        cache.set(cache_key, song_poll_users, LIMIT_MINUTES * 60)
 
         song_name = song_in_queue.playlist_order.playlist.song_name
         user_string = " , ".join(song_poll_users)
@@ -514,7 +517,7 @@ class NightbotUserPollInsertSongToTop(APIView):
         if user in poll_users:
             return Response(f"{user}，天啊！不要重複投票插歌好嗎！")
         poll_users.append(user)
-        cache.set(cache_key, poll_users, 15 * 60)
+        cache.set(cache_key, poll_users, LIMIT_MINUTES * 60)
         # -----------------------------------
 
         song_name = order_song_in_queue.playlist_order.playlist.song_name
