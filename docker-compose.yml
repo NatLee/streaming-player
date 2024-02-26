@@ -12,7 +12,7 @@ services:
       - ./backend:/app
     command: bash docker-entrypoint.sh
     ports:
-      - 8000:8000
+      - 7878:8000
     networks:
       - player-backend-service-net
 
