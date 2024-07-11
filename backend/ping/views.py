@@ -2,12 +2,12 @@ from django.shortcuts import render
 
 # Create your views here.
 
+from django.http import JsonResponse
+
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-
-from common.helperfunc import api_response
 
 class Ping(APIView):
     permission_classes = (AllowAny,)
@@ -29,6 +29,6 @@ class Ping(APIView):
     )
     def get(self, request):
         ret = {"status": "ok", "response": "pong", "detail": "you got it! ;)"}
-        return api_response(ret)
+        return JsonResponse(ret)
 
 
