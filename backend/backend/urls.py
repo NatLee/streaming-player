@@ -9,12 +9,10 @@ from drf_yasg.generators import OpenAPISchemaGenerator
 from rest_framework.permissions import AllowAny, IsAdminUser
 
 from rest_framework.routers import DefaultRouter
-from djoser import views as djoser_views
 
 from django.conf import settings
 
 router = DefaultRouter(trailing_slash=False)
-router.register("users", djoser_views.UserViewSet)
 
 URL_PREFIX = 'api'
 

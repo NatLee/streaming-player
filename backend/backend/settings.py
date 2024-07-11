@@ -91,8 +91,8 @@ INSTALLED_APPS = [
 ]
 
 UNFOLD = {
-    "SITE_TITLE": "播放器平台後台",
-    "SITE_HEADER": "播放器平台後台",
+    "SITE_TITLE": "Player Platform Admin",
+    "SITE_HEADER": "Player Platform Admin",
     "THEME": "light", # Force theme: "dark" or "light". Will disable theme switcher
     "SIDEBAR": {
         "show_search": True,  # Search in applications and models names
@@ -101,6 +101,8 @@ UNFOLD = {
 }
 
 ASGI_APPLICATION = "backend.asgi.application"
+
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -121,7 +123,6 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
-    "author.middlewares.AuthorDefaultBackendMiddleware",
 ]
 
 ROOT_URLCONF = "backend.urls"
@@ -129,7 +130,9 @@ ROOT_URLCONF = "backend.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, "templates").replace("\\", "/")],
+        "DIRS": [
+            os.path.join(BASE_DIR, "templates").replace("\\", "/")
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -141,8 +144,6 @@ TEMPLATES = [
         },
     },
 ]
-
-WSGI_APPLICATION = "backend.wsgi.application"
 
 # -------------- START - Swagger Setting --------------
 
