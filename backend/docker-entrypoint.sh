@@ -1,6 +1,10 @@
 #!/bin/bash
 
+echo "--------------- Starting entrypoint.sh"
+python manage.py makemigrations && python manage.py migrate
+
 echo "--------------- Collect Static"
 python manage.py collectstatic --noinput
-echo "--------------- Running server"
-python manage.py runserver 0.0.0.0:8000
+
+/usr/local/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+
