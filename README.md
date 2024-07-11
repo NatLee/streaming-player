@@ -58,6 +58,36 @@ pip install -r requirements.txt
    See http://localhost:7878/player/
 
 
+## Interaction APIs
+
+You can use the following APIs in streaming chat box to interact with your audience.
+
+- /player/nightbot/current
+   Get current playing video.
+
+- /player/nightbot/current/poll
+   Poll to stop current playing video.
+
+- /player/nightbot/order
+   Order to play a video.
+
+- /player/nightbot/order/{user}/count
+   Get the number of videos that user has ordered.
+
+- /player/nightbot/{song_pk_in_queue}/delete
+   Delete a video with song's ID in queue.
+
+- /player/nightbot/{song_pk_in_queue}/insert
+   Insert a video with song's ID in queue.
+
+In Nightbot, you can add custom command with URL in [command page](https://nightbot.tv/commands/custom).
+
+Specify command `!sr` and give the message below.
+
+```bash
+$(urlfetch https://<YOUR_DOMAIN>/player/nightbot/order?user=$(user)&url=$(querystring))
+```
+
 ## Link
 
 - [Admin](http://localhost:7878/api/__hidden_admin)
