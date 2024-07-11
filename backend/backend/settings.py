@@ -54,8 +54,14 @@ VALID_REGISTER_DOMAINS = ["gmail.com"]
 # Application definition
 
 INSTALLED_APPS = [
-    # admin UI
-    "jazzmin",
+    # admin skin
+    "unfold",  # before django.contrib.admin
+    "unfold.contrib.filters",  # optional, if special filters are needed
+    "unfold.contrib.forms",  # optional, if special form elements are needed
+    "unfold.contrib.inlines",  # optional, if special inlines are needed
+    "unfold.contrib.import_export",  # optional, if django-import-export package is used
+    #"unfold.contrib.guardian",  # optional, if django-guardian package is used
+    "unfold.contrib.simple_history",  # optional, if django-simple-history package is used
     # websocket
     "daphne",
     "channels",
@@ -72,11 +78,9 @@ INSTALLED_APPS = [
     "drf_yasg",
     # package
     "bootstrap3",
-    "djoser",
     "corsheaders",
     "rangefilter",
     "simple_history",
-    "author",
     # custom
     "custom_jwt",
     "custom_auth",
@@ -86,12 +90,22 @@ INSTALLED_APPS = [
     "ping",
 ]
 
+UNFOLD = {
+    "SITE_TITLE": "播放器平台後台",
+    "SITE_HEADER": "播放器平台後台",
+    "THEME": "light", # Force theme: "dark" or "light". Will disable theme switcher
+    "SIDEBAR": {
+        "show_search": True,  # Search in applications and models names
+        "show_all_applications": True,  # Dropdown with all applications and models
+    }
+}
+
 ASGI_APPLICATION = "backend.asgi.application"
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("player-backend-redis", 6379)],
+            "hosts": [("backend-redis", 6379)],
         },
     },
 }
@@ -183,6 +197,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
 
+from django.conf.locale.en import formats as en_formats
+en_formats.DATETIME_FORMAT = "Y/m/d H:i:s"
+
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Taipei"
 USE_I18N = True
@@ -202,68 +219,81 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOG_ROOT = Path(BASE_DIR) / 'logs'
 LOG_ROOT.mkdir(exist_ok=True)
 
-LOG_TYPES = ['file', 'database']
-for log_type in LOG_TYPES:
+LOG_TYPES = {
+    'file': 'standard',
+    'database': 'standard',
+    'api': 'api-format',
+    'auth': 'standard',
+}
+
+FORMATTERS = {
+    'standard': {
+        'format': '[%(asctime)s] [%(filename)s:%(lineno)d] [%(module)s:%(funcName)s] [%(levelname)s] - %(message)s'
+    },
+    "simple": {
+        "format": "%(levelname)s %(message)s"
+    },
+    "api-format": {
+        "format": "[%(asctime)s] [%(funcName)s:%(lineno)d] [%(levelname)s] - %(message)s"
+    },
+}
+
+for log_type in LOG_TYPES.keys():
     log_type_path = Path(BASE_DIR) / 'logs' / log_type
     log_type_path.mkdir(exist_ok=True)
 
 HANDLERS = {}
 
-for log_type in LOG_TYPES:
+for log_type, formatter in LOG_TYPES.items():
     HANDLERS[log_type] = {
         'class': 'common.log.InterceptTimedRotatingFileHandler',
-        'filename': f"{LOG_ROOT / log_type/ f'{log_type}.log'}",
+        'filename': f"{LOG_ROOT / log_type / f'{log_type}.log'}",
         'when': "H",
         'interval': 1,
         'backupCount': 1,
-        'formatter': 'standard',
+        'formatter': formatter,
         'encoding': 'utf-8',
     }
-
-HANDLERS.update({
-    'console': {
-        'class': 'logging.StreamHandler',
-        'stream': sys.stdout
-    }
-})
 
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': True,
-    'formatters': {
-        # LOG格式
-        'standard': {
-            'format': '[%(asctime)s] [%(filename)s:%(lineno)d] [%(module)s:%(funcName)s] [%(levelname)s] - %(message)s'},
-        'simple': {  # 簡單格式
-            'format': '%(levelname)s %(message)s'
-        }
-    },
+    'formatters': FORMATTERS,
     'filters': {
     },
     'handlers': HANDLERS,
     'loggers': {
         'django': {
-            'handlers': ['file', 'console'],
+            'handlers': ['file'],
             'propagate': True,
             'level': "INFO"
         },
-        'celery': {
-            'handlers': ['file'],
-            'propagate': False,
-            'level': "INFO"
-        },
+        '''
         'django.db.backends': {
             'handlers': ['database'],
             'propagate': False,
-            'level': "DEBUG"
+            'level': "INFO"
         },
+        '''
         'django.request': {
             'handlers': ['file'],
             'propagate': False,
             'level': "DEBUG"
-        }
+        },
+        "custom_auth": {
+            "handlers": ["auth"],
+            "propagate": False,
+            "level": "DEBUG"
+        },
+        # JWT相關
+        "custom_jwt": {
+            "handlers": ["auth"],
+            "propagate": False,
+            "level": "DEBUG"
+        },
     }
 }
+
 
 # --------------- END - Log setting ---------------
 
