@@ -1,32 +1,45 @@
-Django==4.1.5
+# Handle two or more services
+supervisor
 
+# Django
+Django==5.0.7
+
+# Django Packages
 django-cors-headers==3.11.0
 django-bootstrap3==21.2
-djangorestframework==3.13.1
-djangorestframework-simplejwt==4.8.0
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+
 django-redis
 django-simple-history
-django-author
-djoser
 
+django-import-export==4.1.1
 django-admin-rangefilter
-
-django-simpleui
-
 whitenoise==6.5.0 # staticfiles
 
+# Admin panel customization
+django-unfold==0.30.0
+
+
+# Swagger
 drf-yasg==1.21.4
 
 pyparsing==3.0.8
 
+# Logger
 loguru
+
+# Misc
 google-auth
 
-ipython # for debugging
+# Debug
+ipython
+ipdb
 
-yt_dlp # for extracting redirect url from youtube
+# Youtube
+yt_dlp
 
-# websocket
+# Websocket
 channels==4.0.0
 channels_redis==4.1.0
 daphne==4.0.0
