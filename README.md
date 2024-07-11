@@ -2,7 +2,7 @@
 
 ![demo](https://user-images.githubusercontent.com/10178964/232607234-aaa30618-3060-4823-9689-1dd20079d10b.png)
 
-This is a player can be used on streaming.
+This is an online player can be used on streaming.
 
 ### Playlist
 
@@ -32,38 +32,34 @@ pip install -r requirements.txt
    docker-compose up
    ```
 
-2. Make migrations and we just use SQLite as our database.
-
-   ```
-   bash ./dev-migrate.sh
-   ```
-
-3. Add superuser.
+2. Add superuser.
 
    ```
    bash ./dev-create-superuser.sh
    ```
 
-4. Check backend.
+3. Check backend.
 
-   Go here http://localhost:8000/api/__hidden_admin/login/ and login as `admin`.
+   > Port is specified in `docker-compose.yml` file. Default is `7878`.
+
+   Go here http://localhost:7878/api/__hidden_admin/login/ and login as `admin`.
    
    And you'll see the page below.
    ![](https://user-images.githubusercontent.com/10178964/218362625-839d20df-8350-4082-a25f-501cad8824d8.png)
 
-5. (Optional) Check Swagger.
+4. (Optional) Check Swagger.
 
-   Go here http://localhost:8000/api/__hidden_swagger/ .
+   Go here http://localhost:7878/api/__hidden_swagger/ .
 
-6. (Optional) Check player in frontend.
+5. (Optional) Check player in frontend.
 
-   See http://localhost:8000/player/
+   See http://localhost:7878/player/
 
 
 ## Link
 
-- [Admin](http://localhost:8000/api/__hidden_admin)
+- [Admin](http://localhost:7878/api/__hidden_admin)
 
-- [Redoc](http://localhost:8000/api/__hidden_redoc)
+- [Redoc](http://localhost:7878/api/__hidden_redoc)
 
-- [Swagger](http://localhost:8000/api/__hidden_swagger)
+- [Swagger](http://localhost:7878/api/__hidden_swagger)
