@@ -21,8 +21,6 @@ services:
       - ./backend:/app
       - ./supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:rw
     command: bash docker-entrypoint.sh
-    ports:
-      - 7878:8000
 
   backend-redis:
     <<: [ *restart, *networks ]
@@ -30,9 +28,20 @@ services:
     hostname: backend-redis
     image: redis:latest
 
+  backend-nginx:
+    <<: [ *restart, *networks]
+    container_name: player-backend-nginx
+    image: nginx:latest
+    hostname: player-backend-nginx
+    ports:
+      - "7878:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend:/src
 
 networks:
   net:
-    name: ${PROJECT_NAME}-net
+    name: player-backend-net
     driver: bridge
 
