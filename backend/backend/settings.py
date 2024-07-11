@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rangefilter",
     "simple_history",
+    "import_export",
     # custom
     "custom_jwt",
     "custom_auth",
