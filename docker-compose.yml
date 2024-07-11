@@ -1,10 +1,19 @@
-version: "3.9"
+
+x-common-networks:
+  &networks
+  networks:
+    - net
+
+x-common-restart:
+  &restart
+  restart: always
+
 
 services:
-  player-backend-api-service:
-    container_name: player-backend-api-service
-    platform: linux/amd64
-    restart: always
+  backend:
+    <<: [ *restart, *networks ]
+    container_name: player-backend-api
+    hostname: backend-api
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -13,16 +22,16 @@ services:
     command: bash docker-entrypoint.sh
     ports:
       - 7878:8000
-    networks:
-      - player-backend-service-net
 
-  player-backend-redis:
+  backend-redis:
+    <<: [ *restart, *networks ]
     container_name: player-backend-redis
+    hostname: backend-redis
     image: redis:latest
-    restart: always
-    networks:
-      - player-backend-service-net
+
 
 networks:
-  player-backend-service-net:
+  net:
+    name: ${PROJECT_NAME}-net
     driver: bridge
+
