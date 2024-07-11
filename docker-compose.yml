@@ -19,6 +19,7 @@ services:
       dockerfile: ./Dockerfile
     volumes:
       - ./backend:/app
+      - ./supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:rw
     command: bash docker-entrypoint.sh
     ports:
       - 7878:8000
