@@ -4,9 +4,14 @@ from django.utils.html import format_html
 
 from rangefilter.filters import DateRangeFilter, DateTimeRangeFilter, NumericRangeFilter
 
-from simple_history.admin import SimpleHistoryAdmin
-
 from player.models import Playlist, PlaylistOrderHistory, PlaylistOrderQueue
+
+
+from unfold.admin import ModelAdmin
+
+from import_export.admin import ImportExportModelAdmin
+from unfold.contrib.import_export.forms import ExportForm, ImportForm, SelectableFieldsExportForm
+
 
 
 def get_last_week():
@@ -14,7 +19,10 @@ def get_last_week():
 
 
 @admin.register(Playlist)
-class PlaylistAdmin(SimpleHistoryAdmin):
+class PlaylistAdmin(ModelAdmin, ImportExportModelAdmin):
+    import_form_class = ImportForm
+    export_form_class = ExportForm
+    export_form_class = SelectableFieldsExportForm
     list_display = (
         "id",
         "song_name",
@@ -43,7 +51,10 @@ class PlaylistAdmin(SimpleHistoryAdmin):
 
 
 @admin.register(PlaylistOrderHistory)
-class PlaylistOrderHistoryAdmin(admin.ModelAdmin):
+class PlaylistOrderHistoryAdmin(ModelAdmin, ImportExportModelAdmin):
+    import_form_class = ImportForm
+    export_form_class = ExportForm
+    export_form_class = SelectableFieldsExportForm
     list_display = (
         "id",
         "playlist",
@@ -65,7 +76,10 @@ class PlaylistOrderHistoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(PlaylistOrderQueue)
-class PlaylistOrderQueueAdmin(admin.ModelAdmin):
+class PlaylistOrderQueueAdmin(ModelAdmin, ImportExportModelAdmin):
+    import_form_class = ImportForm
+    export_form_class = ExportForm
+    export_form_class = SelectableFieldsExportForm
     ordering = ("order",)
     list_display = (
         "id",
