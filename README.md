@@ -34,18 +34,14 @@ pip install -r requirements.txt
    docker-compose up
    ```
 
-2. Add superuser.
-
-   ```
-   bash ./dev-create-superuser.sh
-   ```
-
-3. Check backend.
+2. Go to http://localhost:7878/player/ and create the first user.
 
    > Port is specified in `docker-compose.yml` file. Default is `7878`.
 
-   Go here http://localhost:7878/api/__hidden_admin/login/ and login as `admin`.
-   
+3. (Optional) Check Admin page.
+
+   Go here http://localhost:7878/api/__hidden_admin .
+      
    And you'll see the page below.
    ![](https://user-images.githubusercontent.com/10178964/218362625-839d20df-8350-4082-a25f-501cad8824d8.png)
 
