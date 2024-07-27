@@ -1,394 +1,543 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Player</title>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" href="#" />
-    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.1.1/css/fontawesome.min.css" />
-    <link href="https://vjs.zencdn.net/7.11.4/video-js.css" rel="stylesheet" />
-
-    <style>
-
-      body {
-        font-family: Arial, sans-serif;
-        background-color: #1c1c1c;
-        color: #ccc;
-        margin: 0;
-        padding: 0 0 0 60px;
-      }
-
-      .container {
-        max-width: 960px;
-        margin: 0 auto;
-        padding: 20px;
-      }
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Player</title>
+  <link rel="shortcut icon" href="#" />
+  <link href="https://vjs.zencdn.net/7.11.4/video-js.css" rel="stylesheet" />
+  <style>
+    :root {
+      --primary-color: #bba35c;
+      --secondary-color: #ddc588;
+      --background-color: #1c1c1c;
+      --text-color: #ccc;
+      --menu-hover: rgba(187, 163, 92, 0.2);
+    }
+  
+    /* 基本樣式 */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: var(--background-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 0 0 0 60px;
+    }
+  
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+  
+    /* 佈局 */
+    .dashboard {
+      display: flex;
+      gap: 20px;
+    }
+  
+    .video-container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: auto;
+      margin-bottom: 20px; /* 根據需要調整 */
+    }
     
-      h1, h2, h3, h4, h5, h6 {
-        font-weight: normal;
-        margin: 0;
-        padding: 0;
-        color: #ccc;
-      }
-    
-      h3 {
-        margin-bottom: 10px;
-      }
-    
-      .buttons {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      button {
-        background-color: #bba35c;
-        color: #fff;
-        border: 2px solid #ddc588;
-        padding: 10px 20px;
-        cursor: pointer;
-        font-size: 16px;
-        border-radius: 5px;
-        text-transform: uppercase;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        position: relative;
-        overflow: hidden; /* 隐藏溢出的内容 */
-      }
-      
-      button:hover {
-        background-color: #ddc588;
-        border-color: #f0deaf;
-        transform: translateY(-2px);
-        box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
-        animation: shake 0.2s;
-      }
-      
-      button:active {
-        transform: scale(0.95) translateY(0);
-        opacity: 0.8;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      }
-
-      button:before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.1);
-        opacity: 0;
-        transition: all 0.3s ease;
-        pointer-events: none;
-      }
-      
-      button:hover:before {
-        opacity: 1;
-        background: rgba(255, 255, 255, 0.15);
-      }
-
-      @keyframes shake {
-        0% { transform: translateY(-2px) translateX(0); }
-        25% { transform: translateY(-2px) translateX(2px); }
-        50% { transform: translateY(-2px) translateX(0); }
-        75% { transform: translateY(-2px) translateX(-2px); }
-        100% { transform: translateY(-2px) translateX(0); }
-      }
-
+    .main-content {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  
+    .playlist-container {
+      flex: 1;
+      background-color: rgba(28, 28, 28, 0.8);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+  
+    /* 播放器 */
+    .video-js {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+    }
+  
+    /* 按鈕樣式 */
+    button {
+      background-color: var(--primary-color);
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 16px;
+      border-radius: 5px;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+  
+    button:hover {
+      background-color: var(--secondary-color);
+      transform: translateY(-2px);
+    }
+  
+    button:active {
+      transform: translateY(0);
+    }
+  
     .button-group {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
       margin-bottom: 10px;
     }
-
-    .songlist, .token {
-      margin-bottom: 20px;
+    /* 播放清單樣式 */
+    .playlist-container .section-title {
+      color: var(--primary-color);
+      font-size: 24px;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    
+    .song-item {
+      background-color: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      transition: all 0.3s ease;
+    }
+    
+    .song-item:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .song-item.first-song {
+      background-color: rgba(187, 163, 92, 0.2);
+      border: 1px solid var(--primary-color);
+    }
+    
+    .song-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .song-order {
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--primary-color);
+    }
+    
+    .song-id {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    
+    .song-title {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #fff;
+    }
+    
+    .song-user,
+    .song-created-at {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 5px;
+    }
+    
+    .song-created-at {
+      font-style: italic;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    
+    .song-info-container {
+      margin-bottom: 10px;
+    }
+    
+    .song-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    
+    .action-btn {
+      background-color: rgba(187, 163, 92, 0.2);
+      color: var(--primary-color);
+      border: 1px solid var(--primary-color);
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .action-btn:hover {
+      background-color: var(--primary-color);
+      color: #fff;
+    }
+    
+    /* 滾動條樣式 */
+    #songlist {
+      padding-right: 5px;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+  
+    #songlist::-webkit-scrollbar {
+      width: 6px;
+    }
+  
+    #songlist::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+  
+    #songlist::-webkit-scrollbar-thumb {
+      background-color: var(--primary-color);
+      border-radius: 3px;
+    }
+  
+    /* 點歌表單 */
+    .order-song-form {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+  
+    .order-song-form input[type="text"] {
+      flex-grow: 1;
+      padding: 8px;
+      border: 1px solid var(--primary-color);
+      border-radius: 5px;
+      background-color: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+  
+    .order-song-form input[type="text"]::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+  
+    /* 通知樣式 */
+    .playlist-notification {
+      display: none;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+  
+    .playlist-notification.success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+  
+    .playlist-notification.error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+  
+    .playlist-notification.warning {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeeba;
     }
 
-    .info-container {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+    .menu-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 10px;
+      transition: 0.3s;
+    }
+  
+    .menu-btn:hover {
+      background-color: rgba(187, 163, 92, 0.1);
+      border-radius: 50%;
+    }
+  
+    .menu-btn span {
+      display: block;
+      width: 25px;
+      height: 3px;
+      background-color: var(--primary-color);
+      margin: 5px 0;
+      transition: 0.4s;
+    }
+  
+    .menu-btn.active span:nth-child(1) {
+      transform: rotate(-45deg) translate(-5px, 6px);
+    }
+  
+    .menu-btn.active span:nth-child(2) {
+      opacity: 0;
+    }
+  
+    .menu-btn.active span:nth-child(3) {
+      transform: rotate(45deg) translate(-5px, -6px);
+    }
+  
+    /* 菜單列表 */
+    .menu-list {
+      position: fixed;
+      top: 0;
+      left: -250px;
+      z-index: 999;
+      width: 250px;
+      height: 100vh;
+      list-style-type: none;
+      padding: 60px 0 0;
+      margin: 0;
+      background-color: rgba(42, 42, 42, 0.3);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+      transition: 0.3s;
+      overflow-y: auto;
+    }
+  
+    .menu-list.active {
+      left: 0;
+    }
+  
+    .menu-item {
+      margin-top: 20px;
+      padding: 15px 20px;
+      border-bottom: 1px solid rgba(187, 163, 92, 0.2);
+      transition: 0.3s;
+      background-color: rgba(42, 42, 42, 0.3);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+  
+    .menu-item:hover {
+      background-color: var(--menu-hover);
+    }
+  
+    .menu-item:last-child {
+      border-bottom: none;
+    }
+  
+    .menu-item h3 {
+      margin: 0 0 10px;
+      color: var(--primary-color);
+    }
+  
+    .menu-item button {
+      width: 100%;
+      margin-top: 10px;
+    }
+  
+    .hidden {
+      display: none;
+    }
+
+    .controls-container {
+      background-color: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
       margin-bottom: 20px;
+    }
+    
+    .controls-container:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .info-container {
+      margin-bottom: 20px;
+      background-color: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 15px;
     }
     
     .info-item {
+      margin-bottom: 10px;
       display: flex;
-      align-items: center;
-      gap: 10px;
+      align-items: baseline;
     }
     
-    .info-label {
-      font-weight: bold;
-      color: #bba35c;
+    .info-item strong {
+      min-width: 70px;
+      color: var(--primary-color);
+      font-size: 14px;
     }
     
-    .info-value {
-      color: #ccc;
-    }
-
-    /* Player layout */
-    .video-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      width: 100%;
-      height: 100%;
-      margin-bottom: 20px;
+    .info-item span {
+      color: var(--text-color);
+      word-break: break-all;
+      font-size: 14px;
     }
     
-    .video-js {
-      border: 4px solid #bba35c;
-      border-radius: 10px;
-    }
-
-    /* Dashboard layout */
-    .dashboard {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-gap: 20px;
-    }
-  
-    .left-section {
-      background-color: #333;
-      border-radius: 5px;
-      padding: 20px;
-    }
-
-    .right-section {
+    .button-groups {
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 15px;
     }
     
-    .section-title {
-      color: #bba35c;
-      border-bottom: 1px solid #bba35c;
-      padding-bottom: 10px;
-      margin-bottom: 10px;
+    .button-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
     }
     
-    .section-content {
-      background-color: rgba(187, 163, 92, 0.1);
-      padding: 15px;
-      border-radius: 10px;
-      color: #ccc;
-      margin-bottom: 10px;
+    .btn {
+      background-color: rgba(187, 163, 92, 0.2);
+      color: var(--primary-color);
+      border: 1px solid var(--primary-color);
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 600;
     }
-
-      /* 選單按鈕樣式 */
-      .menu-btn {
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        z-index: 200;
-        width: 30px;
-        height: 20px;
-        cursor: pointer;
-        display: flex;
-        flex-direction: column;
+    
+    .btn:hover {
+      background-color: var(--primary-color);
+      color: var(--background-color);
+      transform: translateY(-1px);
+    }
+    
+    .btn:active {
+      transform: translateY(1px);
+    }
+    
+    .btn-primary {
+      background-color: var(--primary-color);
+      color: var(--background-color);
+    }
+    
+    .btn-primary:hover {
+      background-color: rgba(187, 163, 92, 0.8);
+    }
+    
+    .btn-secondary,
+    .btn-warning,
+    .btn-danger,
+    .btn-success,
+    .btn-outline {
+      background-color: rgba(187, 163, 92, 0.2);
+      color: var(--primary-color);
+    }
+    
+    .btn-secondary:hover,
+    .btn-warning:hover,
+    .btn-danger:hover,
+    .btn-success:hover,
+    .btn-outline:hover {
+      background-color: var(--primary-color);
+      color: var(--background-color);
+    }
+    
+    .song-divider {
+      border: 0;
+      height: 1px;
+      background-image: linear-gradient(to right, rgba(187, 163, 92, 0), rgba(187, 163, 92, 0.75), rgba(187, 163, 92, 0));
+      margin: 20px 0;
+    }
+    
+    @media (min-width: 768px) {
+      .button-groups {
+        flex-direction: row;
         justify-content: space-between;
-        user-select: none;
-      }
-
-      .menu-btn span {
-        height: 3px;
-        background-color: #bba35c; /* 修改顏色 */
-        border-radius: 2px; /* 添加圓角 */
-        transition: all 0.3s ease;
       }
       
-      .menu-btn:hover span:nth-child(1) {
-        transform: translateY(6px) rotate(45deg);
+      .button-group {
+        flex: 1;
+        justify-content: center;
       }
-      
-      .menu-btn:hover span:nth-child(2) {
-        transform: scaleX(0);
-      }
-      
-      .menu-btn:hover span:nth-child(3) {
-        transform: translateY(-6px) rotate(-45deg);
-      }
-      
-      .menu-btn:active {
-        transform: scale(0.95);
-        opacity: 0.8;
-      }
-
-      /* 選單列表樣式 */
-      .menu-list {
-        position: fixed;
-        top: 60px;
-        left: 20px;
-        z-index: 100;
-        list-style-type: none;
-        padding: 0;
-        margin: 0;
-      }
-      
-      .menu-list li {
-        background-color: #333;
-        border-radius: 5px;
-        padding: 10px;
-        margin-bottom: 10px;
-        opacity: 0;
-        transform: translateY(20px);
-        transition: all 0.4s;
-        pointer-events: none;
-        visibility: hidden;
-      }
-
-      .menu-list li:nth-child(1) {
-        transition-delay: 0s;
-      }
-      
-      .menu-list li:nth-child(2) {
-        transition-delay: 0.2s;
-      }
-      
-      .menu-list li.visible {
-        opacity: 1;
-        transform: translateY(0px);
-        pointer-events: auto;
-        visibility: visible;
-      }
-
-      .menu-item {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        background-color: #333;
-        padding: 15px;
-        border-radius: 5px;
-      }
-
-      .g_id_signin {
-        margin-bottom: 10px;
-      }
-
-      .menu-item-btn {
-        background-color: #bba35c;
-        color: #fff;
-        border: 2px solid #ddc588;
-        padding: 10px 20px;
-        cursor: pointer;
-        font-size: 16px;
-        border-radius: 5px;
-        text-transform: uppercase;
-        transition: background-color 0.3s, border-color 0.3s;
-      }
-      
-      .menu-item-btn:hover {
-        background-color: #ddc588;
-        border-color: #f0deaf;
-      }
-
-    </style>
-
-    <meta name="google-signin-scope" content="profile email">
-    <meta name="google-signin-client_id" content="376808175534-d6mefo6b1kqih3grjjose2euree2g3cs.apps.googleusercontent.com">
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <div id="g_id_onload" data-client_id="376808175534-d6mefo6b1kqih3grjjose2euree2g3cs.apps.googleusercontent.com" data-callback="get_jwt_using_google_credential" data-auto_prompt="false" />
-
-  </head>
- 
-  <body>
-
-    <div class="menu-btn" onclick="toggleMenu()">
-      <span></span>
-      <span></span>
-      <span></span>
-    </div>
-    <ul class="menu-list" id="menuList">
-      <li class="hidden">
-        <div class="menu-item">
-          <h3 class="section-title">Login</h3>
-          <div id="token" class="section-content"></div>
-          <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
-          <button class="menu-item-btn" onclick="logout()">Logout</button>
-        </div>
-      </li>
-      <li class="hidden">
-        <div class="menu-item">
-          <button class="menu-item-btn" onclick="javascript:location.href='/api/__hidden_admin/'">Admin</button>
-        </div>
-      </li>
-    </ul>
-
-    <div class="container">
-      <div class="video-container">
-        <video-js
-          id="video"
-          class="video-js"
-          controls
-          preload="auto"
-          width="900"
-          height="550"
-          autoplay="true"
-          data-setup="{}"
-        ></video-js>
-      </div>
+    }
     
-      <div class="info-container section-content">
-        <div class="info-item">
-          <span class="info-label">Title:</span>
-          <span class="info-value" id="title"></span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">URL:</span>
-          <span class="info-value" id="url"></span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Duration:</span>
-          <span class="info-value" id="duration"></span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">User:</span>
-          <span class="info-value" id="user"></span>
-        </div>
-      </div>
+  </style>
+</head>
+<body>
+  <button class="menu-btn" onclick="toggleMenu()">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
+  <ul class="menu-list" id="menuList">
+    <li class="menu-item">
+      <h3 class="section-title">登入</h3>
+      <div id="token" class="section-content"></div>
+      <button onclick="logout()">登出</button>
+    </li>
+    <li class="menu-item">
+      <h3 class="section-title">其他</h3>
+      <button onclick="location.href='/api/__hidden_admin/'">播放器後台</button>
+    </li>
+  </ul>
 
-      <div class="dashboard">
-        <div class="left-section">
-          <!-- Put the video player and buttons here -->
-
-          <div class="button-group">
-            <button onclick="play()">Play</button>
-            <button onclick="pause()">Pause</button>
+  <div class="container">
+    <div class="dashboard">
+      <div class="main-content">
+        <div class="video-container">
+          <video-js id="video" class="video-js" controls preload="auto" autoplay data-setup="{}"></video-js>
+        </div>
+        <div class="controls-container">
+          <div class="info-container section-content">
+            <div class="info-item"><strong>標題：</strong><span id="title"></span></div>
+            <div class="info-item"><strong>URL：</strong><span id="url"></span></div>
+            <div class="info-item"><strong>長度：</strong><span id="duration"></span></div>
+            <div class="info-item"><strong>點歌者：</strong><span id="user"></span></div>
           </div>
-
+          <div class="button-groups">
             <div class="button-group">
-            <button onclick="mute()">Mute</button>
-            <button onclick="unmute()">Unmute</button>
+              <button onclick="play()" class="btn btn-primary">播放</button>
+              <button onclick="pause()" class="btn btn-secondary">暫停</button>
+              <button onclick="mute()" class="btn btn-secondary">靜音</button>
+              <button onclick="unmute()" class="btn btn-secondary">取消靜音</button>
+            </div>
+            <div class="button-group">
+              <button onclick="pass()" class="btn btn-warning">跳過</button>
+              <button onclick="cut()" class="btn btn-danger">切歌</button>
+              <button onclick="cut_and_block()" class="btn btn-danger">切歌並封鎖</button>
+            </div>
+            <div class="button-group">
+              <button onclick="favorite()" class="btn btn-success">收藏</button>
+              <button onclick="unfavorite()" class="btn btn-outline">取消收藏</button>
+            </div>
           </div>
-        
-          <div class="button-group">
-            <button onclick="pass()">Pass</button>
-            <button onclick="cut()">Cut</button>
-            <button onclick="cut_and_block()">Cut & Block</button>
-          </div>
-
-          <div class="button-group">
-            <button onclick="favorite()">Favorite</button>
-            <button onclick="unfavorite()">Unfavorite</button>
-          </div>
-
         </div>
-
-        <div class="right-section">
-          <div class="button-group">
-            <button onclick="load_song_list()">Reload Song List</button>
-          </div>
-          <h3 class="section-title">Song List</h3>
-          <div id="songlist" class="section-content"></div>
+        
       </div>
-    </div>
 
-    <script src="https://code.jquery.com/jquery-2.1.1.min.js" type="text/javascript"></script>
-    <script src="https://vjs.zencdn.net/7.11.4/video.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+      <div class="playlist-container">
+        <h3 class="section-title">播放清單</h3>
+        <div id="playlist-notification" class="playlist-notification"></div>
+        <div class="order-song-form">
+          <input type="text" id="song-url" placeholder="輸入 YouTube 影片 URL">
+          <button onclick="orderSong()">點歌</button>
+        </div>
+        <button onclick="load_song_list()">重新載入播放清單</button>
+        <div id="songlist" class="section-content"></div>
+      </div>      
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://vjs.zencdn.net/7.11.4/video.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <script>
 
@@ -412,39 +561,11 @@
       document.addEventListener("click", closeMenuOnClickOutside);
 
       function toggleMenu() {
-        const menuItems = document.querySelectorAll(".menu-list li");
-        menuItems.forEach(item => item.classList.toggle("visible"));
+        const menuBtn = document.querySelector('.menu-btn');
+        const menuList = document.getElementById('menuList');
+        menuBtn.classList.toggle('active');
+        menuList.classList.toggle('active');
       }
-
-      // ----------------------------------------------
-
-      // 3rd-party login
-
-      function get_jwt_using_google_credential(data) {
-        $.post("/api/auth/google/token", {credential: data.credential}, function(response) {
-          localStorage.setItem("access_token", response.access_token);
-          localStorage.setItem("refresh_token", response.refresh_token);
-          console.log("Google Login");
-      
-          $.ajax({
-            type: "POST",
-            url: "/api/auth/token/verify",
-            data: {token: response.access_token},
-            headers: {
-              "Authorization": "Bearer " + response.access_token
-            },
-            success: function(data) {
-              console.log(data);
-              location.reload();
-            },
-            error: function(data) {
-              console.log(data);
-            }
-          });
-        });
-      }
-
-      // ----------------------------------------------
 
       // Logout
 
@@ -665,6 +786,43 @@
         });
       }
 
+      function showPlaylistNotification(type, message) {
+        const notificationElement = $('#playlist-notification');
+        notificationElement.removeClass('success error warning').addClass(type);
+        notificationElement.text(message);
+        notificationElement.fadeIn().delay(3000).fadeOut();
+      }
+      
+      function orderSong() {
+        const songUrl = $('#song-url').val().trim();
+        if (!songUrl) {
+          showPlaylistNotification('warning', '請輸入 YouTube 影片 URL');
+          return;
+        }
+      
+        $.ajax({
+          type: "POST",
+          url: '/player/playlist/order',
+          dataType: "json",
+          headers: get_auth_headers(),
+          contentType: "application/json",
+          data: JSON.stringify({ url: songUrl }),
+          success: function(data) {
+            if (data.message) {
+              showPlaylistNotification('success', data.message);
+              $('#song-url').val(''); // 清空輸入框
+              load_song_list(); // 重新載入播放清單
+            } else if (data.error) {
+              showPlaylistNotification('error', data.error);
+            }
+          },
+          error: function(xhr, status, error) {
+            console.error('點歌出錯:', error);
+            showPlaylistNotification('error', '點歌失敗，請稍後再試');
+          }
+        });
+      }
+
       function insert_song_to_top(playing_id) {
         console.log(`指定播放順序，佇列ID：` + playing_id);
         $.ajax({
@@ -719,40 +877,57 @@
         });
       }
 
-      function create_styled_button(text, onClickFunction, id) {
-        return `<button class="custom-button" onclick="${onClickFunction}(${id})">${text}</button>`;
-      }
-
       function render_song_list(queue) {
         let html = "";
-        queue.forEach((res) => {
-          const { order, id, song_name, user, url } = res;
+        queue.forEach((res, index) => {
+          const { order, id, song_name, user, url, created_at } = res;
+          const isFirstSong = order === 1;
+          
+          // 格式化 created_at
+          const formattedDate = new Date(created_at).toLocaleString('zh-TW', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          });
       
-          html += order === 1 ? "第一首歌 #" + order + "<br>" : "點歌順序#" + order + "<br>";
           html += `
-          <div class="song-info">
-            <div class="section-content">
-              <div class="song-id">記錄 #${id}</div>
-              <div class="song-title">歌名：${song_name}</div>
+          <div class="song-item ${isFirstSong ? 'first-song' : ''}">
+            <div class="song-header">
+              <span class="song-order">${isFirstSong ? "現正播放" : `#${order}`}</span>
+              <span class="song-id">ID: ${id}</span>
+            </div>
+            <div class="song-info-container">
+              <div class="song-title">${song_name}</div>
               <div class="song-user">點歌者：${user}</div>
-              <button class="copy-url-btn" onclick=navigator.clipboard.writeText("${url}")>Copy URL</button>
+              <div class="song-created-at">點歌時間：${formattedDate}</div>
+            </div>
+            <div class="song-actions">
+              <button class="action-btn copy-url-btn" onclick="navigator.clipboard.writeText('${url}')">複製 URL</button>
+              ${!isFirstSong ? `
+                ${create_styled_button("插歌", "insert_song_to_top", id)}
+                ${create_styled_button("加最愛", "favorite_song", id)}
+                ${create_styled_button("移除最愛", "unfavorite_song", id)}
+                ${create_styled_button("刪歌", "delete_song_in_queue", id)}
+                ${create_styled_button("刪歌封鎖", "delete_and_block_song", id)}
+              ` : ''}
+            </div>
+          </div>
+          ${isFirstSong ? '<hr class="song-divider">' : ''}
           `;
-
-            if (order !== 1) {
-              html += '<br>';
-              html += create_styled_button("插歌", "insert_song_to_top", id);
-              html += create_styled_button("加最愛", "favorite_song", id);
-              html += create_styled_button("移除最愛", "unfavorite_song", id);
-              html += create_styled_button("刪歌", "delete_song_in_queue", id);
-              html += create_styled_button("刪歌拉黑單", "delete_and_block_song", id);
-          }
-
-        html += `</div></div>`;
-      
-        html += order === 1 ? "<h3>------------------------</h3><br>" : "<br>";
         });
         return html;
       }
+      
+      
+      function create_styled_button(text, action, id) {
+        return `<button class="action-btn ${action}-btn" onclick="${action}(${id})">${text}</button>`;
+      }
+      
+      
 
       function get_player_volume() {
         var volume = window.localStorage.getItem("player-volume");
