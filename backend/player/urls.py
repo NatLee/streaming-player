@@ -43,6 +43,11 @@ urlpatterns = [
         name="nightbot_user_poll_insert_song_to_top",
     ),
     path(
+        "playlist/order",
+        views.WebSongOrder.as_view(),
+        name="web_song_order",
+    ),
+    path(
         "playlist/get",
         views.GetSongFromPlaylistQueue.as_view(),
         name="get_song_from_playlist_queue",

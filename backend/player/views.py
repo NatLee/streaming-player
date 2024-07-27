@@ -556,6 +556,119 @@ class NightbotUserPollInsertSongToTop(APIView):
 
         return Response(msg)
 
+class WebSongOrder(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    @swagger_auto_schema(
+        operation_summary="點歌",
+        operation_description="Web端點歌 API",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['url'],
+            properties={
+                'url': openapi.Schema(type=openapi.TYPE_STRING, description="歌曲URL"),
+            },
+        ),
+        responses={
+            "200": openapi.Response(
+                description="成功點歌",
+                examples={
+                    "application/json": {
+                        "message": "點歌成功",
+                        "order": 1,
+                        "song_name": "歌曲名稱",
+                        "wait_time": "等待時間",
+                    }
+                },
+            ),
+            "400": openapi.Response(description="錯誤的請求"),
+            "403": openapi.Response(description="權限不足"),
+        },
+    )
+    def post(self, request):
+        url = request.data.get("url")
+        user = request.user.username  # 假設使用Django的內建用戶系統
+
+        if not url:
+            return Response({"error": "請提供歌曲URL"}, status=400)
+
+        now_order = PlaylistOrderQueue.objects.count()
+
+        if now_order >= LIMIT_SONG_NUMBER:
+            return Response({"error": "要播的歌太多了！再點我要罷工了！"}, status=400)
+
+        try:
+            result = get_youtube_video_info(url)
+        except Exception as e:
+            return Response({"error": "獲取Youtube Video URL失敗"}, status=400)
+
+        song_name = result.get("title")
+        duration = result.get("duration")
+        webpage_url = result.get("webpage_url")
+
+        if duration > 60 * LIMIT_MINUTES:
+            return Response({"error": f"這歌怎麼能超過{LIMIT_MINUTES}分鐘！"}, status=400)
+
+        try:
+            song = Playlist.objects.get(url=webpage_url)
+        except Playlist.DoesNotExist:
+            song = Playlist(song_name=song_name, url=webpage_url, duration=duration)
+            song.save()
+
+        if song.block:
+            return Response({"error": "Sorry! This song has been blocked ;/"}, status=400)
+
+        if song.missing:
+            return Response({"error": "Sad! This song has lost :("}, status=400)
+
+        queue = PlaylistOrderQueue.objects.filter(playlist_order__playlist__url=webpage_url)
+        if queue:
+            element = queue.first()
+            order = element.order
+            queue_user = element.playlist_order.user
+            if order == 1:
+                return Response({"message": f"這首歌被 {queue_user} 點過，順位 {order}，正在放送中！"})
+            return Response({"message": f"這首歌被 {queue_user} 點過，在佇列還沒播放！目前順位 {order}！"})
+
+        poh = PlaylistOrderHistory.objects.create(playlist=song, user=user)
+
+        with transaction.atomic():
+            order = reorder_playlist()
+            total_seconds = PlaylistOrderQueue.objects.aggregate(
+                seconds=Sum("playlist_order__playlist__duration")
+            )["seconds"]
+            new_order_song = PlaylistOrderQueue.objects.create(playlist_order=poh, order=order + 1)
+
+        if total_seconds is None:
+            return Response({"error": f"Sorry {user}！遇到了一點錯誤，無法點播！請稍後再試一次！"}, status=400)
+
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+
+        if hours == 0:
+            time_hint = f"{minutes}分{seconds}秒"
+        else:
+            time_hint = f"{hours}時{minutes}分{seconds}秒"
+
+        msg = f"{user} 無情點播了『{song.song_name}』，播放順位是#{order+1}，ID是『{new_order_song.pk}』，還要再等{time_hint}！"
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            'player',
+            {
+                'type': 'song.order',
+                'message': msg
+            }
+        )
+
+        return Response({
+            "message": "點歌成功",
+            "order": order + 1,
+            "song_name": song.song_name,
+            "wait_time": time_hint,
+        })
+
 class InsertSongInPlaylistQueue(APIView):
     permission_classes = (IsAuthenticated,)
 
@@ -748,7 +861,7 @@ class ShowSongInPlaylistQueue(APIView):
 
         results = []
 
-        for pk, song_name, url, user, order in (
+        for pk, song_name, url, user, order, created_at in (
             PlaylistOrderQueue.objects.all()
             .order_by("order")
             .values_list(
@@ -757,6 +870,7 @@ class ShowSongInPlaylistQueue(APIView):
                 "playlist_order__playlist__url",
                 "playlist_order__user",
                 "order",
+                "created_at",
             )
         ):
             results.append(
@@ -766,6 +880,7 @@ class ShowSongInPlaylistQueue(APIView):
                     "url": url,
                     "user": user,
                     "order": order,
+                    "created_at": created_at,
                 }
             )
 
