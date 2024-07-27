@@ -1,0 +1,229 @@
+{% extends 'login-base.html' %}
+
+{% block title %}Player First Login{% endblock %}
+
+{% block styles %}
+<style>
+  @keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  
+  body {
+    font-family: Arial, sans-serif;
+    background-size: 200% 200%;
+    background-image: linear-gradient(45deg, #1a2a6c, #b21f1f, #fdbb2d);
+    animation: gradientBG 10s ease infinite;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .inner-container {
+    display: flex;
+    border: 1px solid #ccc;
+    padding: 20px;
+    border-radius: 10px;
+    background-color: rgba(255,128,128, 0.4);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-container {
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+  }
+
+  .login-title {
+    animation: fadein 2s, glow 2s ease-in-out infinite alternate;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 2.5em;
+    color: #ffffff;
+    text-shadow: 2px 2px 4px #000000;
+  }
+  
+  @keyframes fadein {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  
+  @keyframes glow {
+    from {
+      text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #e60073, 0 0 40px #e60073;
+    }
+    to {
+      text-shadow: 0 0 20px #fff, 0 0 30px #ff4da6, 0 0 40px #ff4da6, 0 0 50px #ff4da6, 0 0 60px #ff4da6;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<body>
+  <div class="login-container">
+    <h2 class="login-title">Player</h2>
+    <div class="inner-container">
+      <p>看來這是您第一次來到這裡。請建立一個使用者以繼續。</p>
+      <p>It seems this is your first time here. Please create a user to continue.</p>
+      <!-- 表單內容 -->
+      <div id="loginForm">
+        <div class="mb-3">
+          <label for="username" class="form-label">Username</label>
+          <input type="text" class="form-control" id="username" required>
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Password</label>
+          <input type="password" class="form-control" id="password" required>
+          <div id="passwordStrength" class="mt-2"></div>
+        </div>
+        <div class="mb-3">
+          <label for="password-again" class="form-label">Password Again</label>
+          <input type="password" class="form-control" id="password-again" required>
+          <div id="passwordMatch" class="mt-2"></div>
+        </div>
+        <div class="d-grid">
+          <button class="btn btn-primary" id="loginBtn">Login</button>
+        </div>
+      </div>
+
+      {% if social_google_client_id %}
+      <div class="text-center mt-3">
+        <p class="mb-0">- 或者您可以使用以下方式登入 -</p>
+        <p class="mb-0">- Or you can login with -</p>
+        <!-- Google 登入按鈕 -->
+        <div class="d-flex justify-content-center">
+          <div class="mt-3">
+            <div id="g_id_onload"
+              data-client_id="{{ social_google_client_id }}"
+              data-context="signin"
+              data-ux_mode="popup"
+              data-callback="getTokenUsingGoogleCredential"
+              data-auto_select="false"
+              data-itp_support="false"
+              data-auto_prompt="false"
+              data-use_fedcm_for_prompt="true">
+            </div>
+            <div class="g_id_signin"
+              data-type="standard"
+              data-shape="pill"
+              data-theme="filled_black"
+              data-text="signin_with"
+              data-size="large"
+              data-logo_alignment="left">
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function evaluatePasswordStrength(password) {
+    const strengthDisplay = document.getElementById('passwordStrength');
+    let strengthText = '';
+    let color = 'black';
+  
+    if (password.length < 6) {
+      strengthText = 'Weak';
+      color = 'red';
+    } else if (password.length < 10) {
+      strengthText = 'Moderate';
+      color = 'orange';
+    } else {
+      strengthText = 'Strong';
+      color = 'green';
+    }
+  
+    strengthDisplay.textContent = `Password strength: ${strengthText}`;
+    strengthDisplay.style.color = color;
+  }
+
+  function passwordCheck(password, passwordAgain) {
+    return password === passwordAgain;
+  }
+
+  async function registerUser(username, password) {
+    const payload = { username, password };
+
+    const response = await fetch('/player/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      const message = data.error || data.detail || 'Registration failed';
+      throw new Error(message);
+    }
+
+    const data = await response.json();
+    return data;
+  }
+
+  async function handleLoginSubmit() {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const passwordAgain = document.getElementById('password-again').value;
+
+    if (username === password) {
+      showError('Username and password cannot be the same.');
+      return;
+    }
+
+    if (!passwordCheck(password, passwordAgain)) {
+      showError('Passwords do not match.');
+      return;
+    }
+
+    try {
+      const registerResponse = await registerUser(username, password);
+      if (registerResponse.status === 'success') {
+        const tokens = await performLogin(username, password);
+        localStorage.setItem('access_token', tokens.access_token);
+        localStorage.setItem('refresh_token', tokens.refresh_token);
+        window.location.href = '/player/';
+      } else {
+        showError(`Registration failed. ${registerResponse.error}`);
+      }
+    } catch (error) {
+      showError(`Registration/Login failed. ${error.message}`);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('loginBtn').addEventListener('click', handleLoginSubmit);
+    
+    document.getElementById('password').addEventListener('input', (event) => {
+      evaluatePasswordStrength(event.target.value);
+    });
+    
+    document.getElementById('password-again').addEventListener('input', (event) => {
+      const password = document.getElementById('password').value;
+      const passwordMatchDisplay = document.getElementById('passwordMatch');
+
+      const passwordAgain = event.target.value;
+      if (!passwordCheck(password, passwordAgain)) {
+        passwordMatchDisplay.style.color = "red";
+        passwordMatchDisplay.textContent = "Passwords do not match.";
+      } else {
+        passwordMatchDisplay.style.color = "green";
+        passwordMatchDisplay.textContent = "Passwords match.";
+      }
+    });
+  });
+</script>
+{% endblock %}

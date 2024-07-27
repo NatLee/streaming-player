@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+   <meta charset="utf-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <title>{% block title %}Player Login{% endblock %}</title>
+   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+   {% block styles %}{% endblock %}
+   <style>
+      body, html {
+        height: 100%;
+        margin: 0;
+      }
+      @keyframes gradientBG {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      .login-container {
+        padding: 2rem;
+        background: #ffffff9c;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        max-width: 400px;
+        width: 100%;
+        box-sizing: border-box;
+        margin: 0 auto;
+        position: relative;
+        z-index: 2;
+      }
+      .form-control {
+        border-radius: 20px;
+      }
+      .btn-primary {
+        border-radius: 20px;
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+      }
+      .btn-primary:hover {
+        background-color: #007bff;
+      }
+      .btn-secondary {
+        border-radius: 20px;
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+      }
+      .btn-secondary:hover {
+        background-color: #6c757d;
+      }
+      .login-title {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 1.5rem;
+        color: #ff6600;
+        text-align: center;
+      }
+      body.swal2-shown .login-container {
+        transition: transform 0.3s ease-in-out;
+        transform: translateY(-100%);
+      }
+   </style>
+</head>
+
+{% block body %}{% endblock %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+<!-- SweetAlert2 Library -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<!-- Google Sign-In Library -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- Custom Common JavaScript -->
+<script>
+
+
+    // Function to show error using Swal
+    function showError(message) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Oops...',
+        text: message,
+      });
+    }
+
+    // Function to renew the access token
+    async function verifyAccessToken(accessToken) {
+        const response = await fetch('/api/auth/token/verify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token: accessToken })
+        });
+    
+        if (response.ok) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
+    // Function to check if the user is already logged in
+    async function checkLoginStatus() {
+        const accessToken = localStorage.getItem('access_token');
+        if (accessToken) {
+            const tokenIsValid = await verifyAccessToken(accessToken);
+            if (tokenIsValid) {
+                // Token is valid or was successfully renewed, redirect to player page
+                window.location.href = '/player/';
+                return;
+            }
+        }
+    }
+
+    // Helper function to perform the login action
+    async function performLogin(username, password) {
+      const payload = { username, password };
+
+      const response = await fetch('/api/auth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        const message = data.error || data.detail || 'Login failed';
+        throw new Error(message);
+      }
+
+      const data = await response.json();
+      return data; // Contains access_token and refresh_token
+    }
+
+    // 3rd-party login
+
+    function getTokenUsingGoogleCredential(data) {
+      $.post("/api/auth/google/token", {credential: data.credential}, function(response) {
+          localStorage.setItem("access_token", response.access_token);
+          localStorage.setItem("refresh_token", response.refresh_token);
+          console.log("Google Login");
+      
+          $.ajax({
+          type: "POST",
+          url: "/api/auth/token/verify",
+          data: {token: response.access_token},
+          headers: {
+              "Authorization": "Bearer " + response.access_token
+          },
+          success: function(data) {
+              console.log(data);
+              location.replace('/player/')
+          },
+          error: function(data) {
+              console.log(data);
+              Swal.fire({ icon: 'question', title: 'Error', text: data });
+          }
+          });
+      });
+  }
+
+  // Check login status when the page loads
+  checkLoginStatus();
+</script>
+
+<!-- Custom Scripts -->
+{% block scripts %}{% endblock %}
+
+</html>

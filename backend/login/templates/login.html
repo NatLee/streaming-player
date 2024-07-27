@@ -1,0 +1,204 @@
+{% extends 'login-base.html' %}
+
+{% block title %}Player Login{% endblock %}
+
+{% block styles %}
+<style>
+  @keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  
+  body {
+    font-family: 'Microsoft JhengHei', Arial, sans-serif;
+    background-size: 200% 200%;
+    background-image: linear-gradient(45deg, #1a2a6c, #b21f1f, #fdbb2d);
+    animation: gradientBG 10s ease infinite;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+  }
+  
+  .login-container {
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+  }
+  
+  .login-title {
+    animation: fadein 2s, glow 2s ease-in-out infinite alternate;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 2.5em;
+    text-shadow: 2px 2px 4px #000000;
+  }
+  
+  @keyframes fadein {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  
+  @keyframes glow {
+    from {
+      text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #ff7700, 0 0 40px #ff7700;
+    }
+    to {
+      text-shadow: 0 0 20px #fff, 0 0 30px #ff7700, 0 0 40px #ff7700, 0 0 50px #ff7700, 0 0 60px #ff7700;
+    }
+  }
+
+  .login-form {
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 0 20px rgba(255, 128, 0, 0.3);
+    border: 1px solid #ff9900;
+  }
+
+  .login-form input {
+    margin-bottom: 15px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ff9900;
+    border-radius: 5px;
+    background-color: rgba(255, 128, 0, 0.1);
+    color: #fff;
+    transition: all 0.3s ease;
+  }
+
+  .login-form input:focus {
+    outline: none;
+    box-shadow: 0 0 10px #ff9900;
+  }
+
+  .login-form input::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .login-form button {
+    width: 100%;
+    padding: 10px;
+    background-color: #ff9900;
+    color: #000;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  .login-form button:hover {
+    background-color: #cc9900;
+    box-shadow: 0 0 15px #ff9900;
+  }
+
+  .or-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 20px 0;
+    color: #fff;
+  }
+
+  .or-divider::before,
+  .or-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #ff9900;
+  }
+
+  .or-divider span {
+    padding: 0 10px;
+    font-size: 14px;
+  }
+
+  .g_id_signin {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  .login-form button {
+    animation: pulse 2s infinite;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<body>
+  <div class="login-container">
+    <h2 class="login-title">Player Login</h2>
+    <div class="login-form">
+      <form id="loginForm">
+        <div class="mb-3">
+          <input type="text" class="form-control" id="username" placeholder="使用者名稱" required>
+        </div>
+        <div class="mb-3">
+          <input type="password" class="form-control" id="password" placeholder="密碼" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Login</button>
+      </form>
+
+      {% if social_google_client_id %}
+      <div class="or-divider">
+        <span>或</span>
+      </div>
+      <div class="text-center">
+        <div id="g_id_onload"
+          data-client_id="{{ social_google_client_id }}"
+          data-context="signin"
+          data-ux_mode="popup"
+          data-callback="getTokenUsingGoogleCredential"
+          data-auto_select="false"
+          data-itp_support="false"
+          data-auto_prompt="false"
+          data-use_fedcm_for_prompt="true">
+        </div>
+        <div class="g_id_signin"
+          data-type="standard"
+          data-shape="pill"
+          data-theme="filled_black"
+          data-text="signin_with"
+          data-size="large"
+          data-logo_alignment="left">
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+  async function handleLoginSubmit(event) {
+    event.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    try {
+      const tokens = await performLogin(username, password);
+      localStorage.setItem('access_token', tokens.access_token);
+      localStorage.setItem('refresh_token', tokens.refresh_token);
+      await verifyAccessToken(tokens.access_token);
+      window.location.href = '/player/';
+    } catch (error) {
+      showError(`登入失敗。${error.message}`);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('loginForm').addEventListener('submit', handleLoginSubmit);
+  });
+</script>
+{% endblock %}
