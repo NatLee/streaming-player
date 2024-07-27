@@ -28,16 +28,18 @@ urlpatterns += [
 
 # app route
 urlpatterns += [
-    # router
+    # Router
     path(f"{URL_PREFIX}/", include(router.urls), name="api"),
-    # auth
+    # Auth
     path(f"{URL_PREFIX}/auth/", include("custom_jwt.urls")),
-    # google login
+    # Google Login
     path(f"{URL_PREFIX}/auth/google/", include("custom_auth.urls")),
-    # ping
-    path("ping", include("ping.urls"), name="ping"),
-    # player
+    # Ping
+    path("player/ping", include("ping.urls"), name="ping"),
+    # Player
     path("player/", include("player.urls"), name="player"),
+    # Login
+    path("player/", include("login.urls"), name="login"),
 ]
 
 

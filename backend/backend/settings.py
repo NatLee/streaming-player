@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     "custom_auth",
     "userprofile",
     "player",
+    "login",
     # test
     "ping",
 ]
