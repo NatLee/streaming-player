@@ -33,9 +33,6 @@ def dashboard(request):
     # template path
     return render(request, "index.html")
 
-def login(request):
-    return render(request, "login.html")
-
 def reorder_playlist() -> int:
     count = 0
     with transaction.atomic():

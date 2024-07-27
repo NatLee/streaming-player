@@ -7,7 +7,6 @@ logger = logging.getLogger(__name__)
 
 urlpatterns = [
     path("", views.dashboard, name="player"),
-    path("login", views.login, name="player-login"),
     path(
         "youtube-video-info",
         views.YoutubeVideoInfo.as_view(),
