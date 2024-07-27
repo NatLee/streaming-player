@@ -2,7 +2,8 @@
 
 > Notice that here use package [yt_dlp](https://github.com/yt-dlp/yt-dlp) to get link of video on Youtube.
 
-![demo](https://user-images.githubusercontent.com/10178964/232607234-aaa30618-3060-4823-9689-1dd20079d10b.png)
+![demo](https://github.com/user-attachments/assets/b79bb027-efbd-45ed-bd2a-9f073efb55d9)
+
 
 This is an online player can be used on streaming.
 
