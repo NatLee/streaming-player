@@ -28,7 +28,7 @@ async fn first_run_setup_login_and_roles() {
     assert_eq!(st["needs_setup"], false);
     assert_eq!(st["user"]["username"], "admin");
 
-    // Setup only works once (v1 let anyone register at any time).
+    // Setup only works once; later accounts come from sign-up or the users page.
     let (status, _) = t
         .call(
             Method::POST,
