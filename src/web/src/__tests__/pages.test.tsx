@@ -76,4 +76,13 @@ describe("helpers", () => {
       { url: "https://b", title: "x", duration_secs: null, favorite: false, blocked: true },
     ]);
   });
+
+  it("reads yes/no cells the way spreadsheets write them", () => {
+    // Excel writes TRUE/FALSE, Django's export (v1) writes 1/0.
+    const csv = "url,title,favorite,blocked\nhttps://a,a,TRUE,0\nhttps://b,b,1, \n";
+    expect(parseCsv(csv).map((r) => [r.favorite, r.blocked])).toEqual([
+      [true, false],
+      [true, false],
+    ]);
+  });
 });

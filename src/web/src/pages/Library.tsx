@@ -20,6 +20,10 @@ interface Record_ {
   blocked: boolean;
 }
 
+/** Spreadsheets write yes/no cells in different ways (true, TRUE, 1). */
+const TRUE_CELLS = new Set(["true", "1", "yes", "y"]);
+const truthy = (cell: string | undefined) => TRUE_CELLS.has((cell ?? "").trim().toLowerCase());
+
 /** Parse the CSV this app exports (quoted fields allowed). */
 export function parseCsv(text: string): Record_[] {
   const rows: string[][] = [];
@@ -59,8 +63,8 @@ export function parseCsv(text: string): Record_[] {
       url: r[col("url")] ?? "",
       title: r[col("title")] ?? "",
       duration_secs: r[col("duration_secs")] ? Number(r[col("duration_secs")]) : null,
-      favorite: r[col("favorite")] === "true",
-      blocked: r[col("blocked")] === "true",
+      favorite: truthy(r[col("favorite")]),
+      blocked: truthy(r[col("blocked")]),
     }));
 }
 
