@@ -1,71 +1,80 @@
 # Moving from v1 (Django) to v2
 
-v2 is a rewrite: one container instead of Django + Redis + nginx, a new admin page, and chat connections built in. Your Nightbot commands keep working, and your song library and request history can come along.
+v2 is a new program and **not compatible with v1**. The old Nightbot URLs (`/player/nightbot/…`), the JWT endpoints of v1 and its database don't carry over. Moving takes about ten minutes by hand: start v2, switch your bot commands, and bring your songs if you want them.
 
-## 1. Stop v1
-
-In the v1 folder:
+## 1. Stop v1, start v2
 
 ```bash
+# in the v1 folder
 docker compose down
-```
 
-Keep the folder: v1's database is `backend/db.sqlite3` in it.
-
-## 2. Start v2
-
-```bash
-git pull            # or a fresh clone
+# v2
+git clone https://github.com/NatLee/streaming-player.git
+cd streaming-player
 docker compose up -d --build
 ```
 
-It listens on **7878**, the same port as v1, so existing Nightbot URLs keep their address. Open <http://localhost:7878/>. On first run you create the admin account. v1 accounts aren't copied: Django's password hashes can't be reused, and v1 let anyone register.
+v2 also listens on port **7878**. Open <http://localhost:7878/>; the first visit creates the admin account. v1 accounts aren't copied: make new ones on **使用者與權限**, or let people register at `/register`.
 
-## 3. Bring your songs and history (optional)
+## 2. Replace the bot commands
 
-`import-v1` copies v1's song library, including favorites (the default playlist), blocked and missing marks, plus the whole request history. Favorites keep playing when the queue is empty, and `!songstats` keeps counting. It runs once per database. v1's pending queue isn't copied.
+Your Nightbot `!sr` was something like `$(urlfetch https://your.host/player/nightbot/order?user=$(user)&url=$(querystring))`. That address no longer answers.
 
-```bash
-docker compose stop streaming-player
-docker compose run --rm \
-  -v /path/to/v1/backend/db.sqlite3:/v1.sqlite3:ro \
-  streaming-player streaming-player import-v1 /v1.sqlite3
-docker compose start streaming-player
-```
+1. Open **聊天室連線 → 聊天機器人** on the admin page.
+2. Copy the text for your bot (Nightbot, StreamElements, Fossabot, Streamer.bot). It already contains your address and the bot key.
+3. In the bot, edit `!sr` and paste it in place of the old message.
+4. Do the same for the other commands you used. **其他指令的網址** on the same page lists all of them.
 
-## What moved where
+| v1 URL | v2 command (default words) |
+|---|---|
+| `order?user=&url=` | `sr` (also `點歌`, `songrequest`) |
+| `current` | `song` (also `現在`, `nowplaying`) |
+| `current/poll` | `voteskip` (also `卡歌`) |
+| `order/{user}/count` | `songstats` (also `點歌統計`) |
+| `{id}/delete` | `wrongsong` (also `刪歌`) |
+| `{id}/insert` | `bump` (also `插歌`) |
+
+Or skip the bot: v2 reads Twitch chat and YouTube live chat by itself ([Twitch](twitch.md), [YouTube](youtube.md)).
+
+The reply texts use the same wording as v1 by default, and every text can be changed on **聊天指令**.
+
+## 3. Bring your songs (optional)
+
+v2 doesn't read the v1 database. Two ways to get your starred songs (the default playlist) back:
+
+- **Add them again**: on **歌曲庫**, paste a link, keep **加入預設播放清單** ticked, press **加入**.
+- **Import a CSV**: while v1 still runs, open its Django admin (`/api/__hidden_admin`), go to 歌曲清單 and export it as CSV. In the first row, rename `song_name` to `title`, `duration` to `duration_secs` and `block` to `blocked` (`url` and `favorite` stay). Then import the file on **歌曲庫 → 匯入**. Yes/no cells may be `1`/`0` or `true`/`false`; other columns are ignored. Nothing is looked up online during the import.
+
+Request history and statistics start fresh.
+
+## Where things are now
 
 | v1 | v2 |
 |---|---|
-| `/player/` (the player page) | `/admin` (control) and `/obs/player?key=…` (playback in OBS); the old address redirects |
-| `/player/login`, first-login page | `/login` (first run creates the admin) |
-| `/api/__hidden_admin` (Django admin) | `/admin` pages: library, history, block list, users; the old address redirects |
-| `/api/__hidden_swagger`, `/api/__hidden_redoc` | `/api/docs/` (Swagger UI, OpenAPI at `/api/openapi.json`); the old addresses redirect |
-| `/player/nightbot/current`, `current/poll`, `order`, `order/{user}/count`, `{id}/delete`, `{id}/insert` | **unchanged**, see below |
-| `/player/playlist/queue` (public JSON) | unchanged, same fields |
-| `/player/ping` | unchanged (`/api/health` is the new one) |
+| `/player/` (the player page) | `/admin` to control, `/obs/player?key=…` to play in OBS |
+| `/player/login`, `/player/register` | `/login`, `/register` |
+| `/api/__hidden_admin` (Django admin) | `/admin` pages: library, history, block list, users and permissions |
+| `/api/__hidden_swagger`, `/api/__hidden_redoc` | `/api/docs/` (Swagger UI), `/api/openapi.json` |
+| `/player/nightbot/…` | `/api/bot/{command}?key=…` ([chat bots](chat-bots.md)) |
+| `/player/playlist/queue` | `/api/public/state` (if the viewer page is on) |
+| `/player/ping` | `/api/health` |
 | WebSocket `/ws/player/` | `/api/ws` |
 | Django admin import/export | **歌曲庫 → 匯出／匯入** (CSV or JSON) |
 
-## Nightbot URLs
+None of the old addresses redirect; they answer 404.
 
-The six `/player/nightbot/…` URLs answer exactly where they did, through the same command engine as everything else. Their texts, limits and permissions come from **聊天指令** and **設定**. Defaults match v1: 30 songs in the queue, 15 minutes per video, 3 votes to skip, 2 votes to bump.
+## What changed
 
-Small differences:
+- **One container** instead of Django, Redis, nginx and supervisord.
+- **Chat**: Twitch and YouTube chat are read directly; any bot can use `/api/bot/{command}` with a key. Commands, levels, cooldowns and replies are editable.
+- **Playback**: YouTube plays in YouTube's own player; other sites go through yt-dlp. The OBS player and overlay are separate pages, synced over WebSocket.
+- **Accounts**: roles with permission points instead of "logged in or not"; registration is a setting (open by default, new accounts are viewers); Google sign-in follows the same setting instead of letting in any gmail.com address. Set `SP_GOOGLE_CLIENT_ID` and `SP_GOOGLE_CLIENT_SECRET`, with redirect URI `{SP_PUBLIC_URL}/api/auth/google/callback`. See [users and permissions](users-and-permissions.md).
+- **API access**: `/api/auth/token`, `/api/auth/refresh` and `/api/auth/revoke` for access tokens, plus personal API tokens, instead of v1's Simple JWT endpoints.
+- **Missing videos**: marked after 3 failed plays in a row (a setting), not on the first failure (v1 issue #2).
+- **Volume**: v1 kept it per browser, starting at 0.3%. Now there is one shared volume (default 100); set the stream's level in the OBS mixer.
+- **YouTube playback**: v1 played everything from yt-dlp's direct link. v2 uses YouTube's own embedded player and falls back to the direct link when a video can't be embedded. **設定 → 播放 → yt-dlp 直接連結** brings v1's way back.
+- **Limits**: the defaults match v1: 30 songs in the queue, 15 minutes per video, 3 votes to skip, 2 votes to bump.
 
-- Replies are plain text. v1 returned a JSON string, so Nightbot showed it in quotes.
-- `{id}/delete` now also lets a moderator delete anyone's song. In v1, only the requester could.
-- They have no key. Once your commands use the new `/api/bot/…` URLs (see [chat bots](chat-bots.md)), turn them off with **聊天室連線 → 接受 v1 的 Nightbot 網址**. The page shows when they were last used. They will be removed in v3.
+## Backups from now on
 
-## Removed (they only served v1's own page)
-
-- JWT sign-in: `/api/auth/token`, `/token/refresh`, `/token/verify`, and the Google token endpoint `/api/auth/google/token`. The web page now uses a session cookie. Google sign-in is `/api/auth/google/start`.
-- `/player/register`. v1 let anyone create an account at any time; now only the first-run setup does, and admins add other users.
-- The JWT-only player endpoints `/player/playlist/get`, `…/mark`, `…/insert`, `…/delete`, `/player/playlist/order` and `/player/youtube-video-info`. The admin API under `/api/queue`, `/api/player` and `/api/library` covers all of them.
-
-## Behaviour changes
-
-- **Google sign-in**: v1 let in any gmail.com account. Now only addresses an admin entered on **使用者** can sign in. Set `SP_GOOGLE_CLIENT_ID` and `SP_GOOGLE_CLIENT_SECRET`, with redirect URI `{SP_PUBLIC_URL}/api/auth/google/callback`.
-- **Missing videos**: v1 marked a video missing the first time it failed. Now it takes 3 failures in a row (a setting). This was issue #2.
-- **Volume**: v1 kept the volume per browser, starting at 0.3%. Now there is one shared volume (default 100); control the stream's level in the OBS mixer.
-- **YouTube playback**: v1 played everything from yt-dlp's direct link. v2 uses YouTube's own embedded player and falls back to the direct link when a video can't be embedded. To get v1's way back, use **設定 → 播放 → yt-dlp 直接連結**.
+**設定 → 備份和搬家** saves settings, chat commands and the block list as one JSON file and restores them on another server. **歌曲庫 → 匯出** saves the library as CSV or JSON.

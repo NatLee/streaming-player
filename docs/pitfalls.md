@@ -11,6 +11,19 @@ Problems met while building v2. Each one: what we saw, why, the fix, and how to 
 - **Fix**: every write transaction starts with `BEGIN IMMEDIATE` (`db::write_tx`), which takes the write lock up front and waits for it.
 - **Avoid**: never use `pool.begin()` for a transaction that writes.
 
+### A migration that rebuilds `users` signs everyone out
+
+- **Why**: SQLite can't drop a CHECK constraint, so `0002_roles_tokens.sql` copies `users` into a new table and drops the old one. With foreign keys on, `DROP TABLE` first deletes every row, and `sessions` follow through `ON DELETE CASCADE`.
+- **Effect**: after upgrading to the version with roles, everyone signs in again once. Nothing else is lost.
+
+## Tokens
+
+### A numeric `sub` makes every JWT invalid
+
+- **Seen**: freshly issued access tokens were all refused.
+- **Why**: `jsonwebtoken`'s check for required claims reads `sub` as a string. Our `sub` is the numeric user id, so "require sub" failed to parse.
+- **Fix**: only `exp` is a required spec claim; the user id is checked against the database anyway.
+
 ## YouTube
 
 ### The player shows error 153

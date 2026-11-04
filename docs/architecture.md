@@ -9,7 +9,9 @@ src/api   Rust server
   media/     link parsing, yt-dlp, YouTube Data API, streaming proxy
   queue.rs   queue rules, order, votes, moving to the next song
   live.rs    WebSocket hub, state snapshots, player leader election
-  legacy.rs  everything kept for v1 (Nightbot URLs, redirects, v1 database import)
+  auth.rs    who is calling: session cookie, JWT access token or API token; Can<permission>
+  perm.rs    the permission points; roles.rs: roles and the last-manager guard
+  tokens.rs  access tokens (JWT), refresh tokens, personal API tokens
 src/web   React + Tailwind (admin, OBS player and overlay, viewer page)
 ```
 
@@ -22,9 +24,8 @@ Every source turns a chat message into `(who, command word, arguments)`:
 | Twitch EventSub | chatter login + display name | badges |
 | YouTube live chat | `yt:<channel id>` + display name | owner / moderator / member flags |
 | `/api/bot/{command}` | `user=` or the bot's headers | `level=` or Nightbot's header |
-| v1 `/player/nightbot/…` | `user=` | everyone |
 
-`commands::engine` then looks up the command, checks it is enabled, the level, and the per-person cooldown, runs the action, and renders the reply template for the outcome. Defaults reproduce v1's Chinese replies; every text can be changed on the admin page. Role names from all platforms go through one alias table (`models::LEVEL_ALIASES`), and bot header formats through one profile table (`chat::bots::HEADER_PROFILES`).
+`commands::engine` then looks up the command, checks it is enabled, the level, and the per-person cooldown, runs the action, and renders the reply template for the outcome. The default replies keep the wording v1 used; every text can be changed on the admin page. Role names from all platforms go through one alias table (`models::LEVEL_ALIASES`), and bot header formats through one profile table (`chat::bots::HEADER_PROFILES`).
 
 ## The queue
 
@@ -92,6 +93,15 @@ Server → page:
 - `{"type":"leader","leader":true}` — sent to player pages when the leader changes
 
 Player → server (leader only): `started`, `progress` (`position_ms`), `ended`, `error` (`reason`), `duration` (`secs`), each with `request_id`.
+
+## Accounts and permissions
+
+- One extractor (`auth::CurrentUser`) reads the session cookie, or `Authorization: Bearer` with a JWT access token or a `spat_` API token. `Can<need::X>` adds one permission point; a handler that needs more checks `user.require(...)` for the extra part (e.g. removing *and blocking* needs `blocklist.manage` too).
+- Permissions come from the role at every request, so a role change takes effect on the next click. Access tokens carry the user's token version; disabling or a new password bumps it (and deletes sessions and refresh tokens), so old tokens fail at once.
+- API tokens are limited to the permissions picked when they were made, and never exceed the owner's current ones.
+- `roles::ensure_manager_left` runs inside every user and role change and rolls it back if no enabled account could manage users afterwards.
+- Settings sections map to permissions in one table (`settings::SECTION_PERMS`); WebSocket messages too (`MESSAGE_PERMS` in `routes/live.rs`).
+- `tests/accounts.rs` walks every operation in the OpenAPI document with an account that has no permissions and expects 403.
 
 ## Security notes
 

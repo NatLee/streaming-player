@@ -4,7 +4,8 @@
 - [Twitch chat](twitch.md): create the app, sign in with a code, roles
 - [YouTube live chat](youtube.md): API key, quota, roles
 - [Chat bots](chat-bots.md): Nightbot, StreamElements, Fossabot, Streamer.bot, the HTTP API
-- [Moving from v1](migration-v1.md): what changed, URL map, importing the v1 database
+- [Users and permissions](users-and-permissions.md): roles, registration, tokens for programs
+- [Moving from v1](migration-v1.md): switching your bot commands and library by hand
 - [How it works](architecture.md): command engine, queue, sync, media, WebSocket protocol
 - [Pitfalls](pitfalls.md): problems met while building and their fixes
 
