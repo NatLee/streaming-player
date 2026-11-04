@@ -5,7 +5,7 @@ services:
     container_name: streaming-player
     restart: unless-stopped
     ports:
-      # v1 used 7878 too, so old Nightbot commands keep their address
+      # The same port as v1
       - "7878:7878"
     volumes:
       # SQLite database, chat sign-ins and keys live here; back it up

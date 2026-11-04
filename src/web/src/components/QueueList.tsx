@@ -3,11 +3,14 @@ import { clock, SOURCE_LABEL } from "../lib/format";
 import type { QueueItem } from "../types";
 import { Empty, Thumb } from "./ui";
 
+/** Admin buttons; each one shows only when its action is given (the caller passes the
+ * ones the user has permission for). */
 export interface QueueActions {
-  move: (item: QueueItem, index: number) => void;
-  playNow: (item: QueueItem) => void;
-  remove: (item: QueueItem, block?: "song" | "user") => void;
-  favorite: (item: QueueItem) => void;
+  move?: (item: QueueItem, index: number) => void;
+  playNow?: (item: QueueItem) => void;
+  remove?: (item: QueueItem) => void;
+  removeAndBlock?: (item: QueueItem, block: "song" | "user") => void;
+  favorite?: (item: QueueItem) => void;
 }
 
 /** The waiting list. With `actions` it shows the admin buttons. */
@@ -55,37 +58,51 @@ export function QueueList({
             </div>
             {actions && (
               <div className="flex shrink-0 items-center">
-                <button className="icon-btn" title="上移" disabled={i === 0} onClick={() => actions.move(item, i - 1)}>
+                {actions.move && (
+                  <>
+                <button className="icon-btn" title="上移" disabled={i === 0} onClick={() => actions.move?.(item, i - 1)}>
                   <ArrowUp className="size-4" />
                 </button>
-                <button className="icon-btn" title="下移" disabled={i === items.length - 1} onClick={() => actions.move(item, i + 1)}>
+                <button className="icon-btn" title="下移" disabled={i === items.length - 1} onClick={() => actions.move?.(item, i + 1)}>
                   <ArrowDown className="size-4" />
                 </button>
-                <button className="icon-btn" title="移到下一首" disabled={i === 0} onClick={() => actions.move(item, 0)}>
+                <button className="icon-btn" title="移到下一首" disabled={i === 0} onClick={() => actions.move?.(item, 0)}>
                   <ChevronsUp className="size-4" />
                 </button>
-                <button className="icon-btn" title="立即插播" onClick={() => actions.playNow(item)}>
-                  <Zap className="size-4" />
-                </button>
-                <button
-                  className={`icon-btn ${item.song.favorite ? "text-gold-400" : ""}`}
-                  title={item.song.favorite ? "從預設播放清單移除" : "加入預設播放清單"}
-                  onClick={() => actions.favorite(item)}
-                >
-                  <Star className={`size-4 ${item.song.favorite ? "fill-current" : ""}`} />
-                </button>
+                  </>
+                )}
+                {actions.playNow && (
+                  <button className="icon-btn" title="立即插播" onClick={() => actions.playNow?.(item)}>
+                    <Zap className="size-4" />
+                  </button>
+                )}
+                {actions.favorite && (
+                  <button
+                    className={`icon-btn ${item.song.favorite ? "text-gold-400" : ""}`}
+                    title={item.song.favorite ? "從預設播放清單移除" : "加入預設播放清單"}
+                    onClick={() => actions.favorite?.(item)}
+                  >
+                    <Star className={`size-4 ${item.song.favorite ? "fill-current" : ""}`} />
+                  </button>
+                )}
                 <button className="icon-btn" title="複製網址" onClick={() => void navigator.clipboard?.writeText(item.song.url)}>
                   <Copy className="size-4" />
                 </button>
-                <button className="icon-btn hover:text-red-400" title="刪除" onClick={() => actions.remove(item)}>
-                  <Trash2 className="size-4" />
-                </button>
-                <button className="icon-btn hover:text-red-400" title="刪除並封鎖這首歌" onClick={() => actions.remove(item, "song")}>
-                  <Ban className="size-4" />
-                </button>
-                <button className="icon-btn hover:text-red-400" title="刪除並封鎖點歌者" onClick={() => actions.remove(item, "user")}>
-                  <UserX className="size-4" />
-                </button>
+                {actions.remove && (
+                  <button className="icon-btn hover:text-red-400" title="刪除" onClick={() => actions.remove?.(item)}>
+                    <Trash2 className="size-4" />
+                  </button>
+                )}
+                {actions.removeAndBlock && (
+                  <>
+                    <button className="icon-btn hover:text-red-400" title="刪除並封鎖這首歌" onClick={() => actions.removeAndBlock?.(item, "song")}>
+                      <Ban className="size-4" />
+                    </button>
+                    <button className="icon-btn hover:text-red-400" title="刪除並封鎖點歌者" onClick={() => actions.removeAndBlock?.(item, "user")}>
+                      <UserX className="size-4" />
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </li>

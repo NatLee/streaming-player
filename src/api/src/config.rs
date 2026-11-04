@@ -6,7 +6,7 @@ use std::{env, path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
 
-/// v1 listened on 7878; keeping it means old Nightbot commands keep their URL.
+/// The same port v1 used, so firewall rules and OBS setups don't change.
 pub const DEFAULT_BIND: &str = "0.0.0.0:7878";
 pub const DEFAULT_PUBLIC_URL: &str = "http://localhost:7878";
 
@@ -84,6 +84,10 @@ pub struct Config {
     pub google: Option<GoogleConfig>,
     /// Default Twitch application client id; the admin page can override it.
     pub twitch_client_id: Option<String>,
+    /// Signing key for API access tokens. Unset: a random key kept in the database.
+    pub jwt_secret: Option<String>,
+    /// A reverse proxy in front sets `X-Forwarded-For`; trust it for rate limits.
+    pub trust_proxy: bool,
     pub endpoints: Endpoints,
 }
 
@@ -111,6 +115,8 @@ impl Config {
             },
             google: GoogleConfig::from_env()?,
             twitch_client_id: var("SP_TWITCH_CLIENT_ID"),
+            jwt_secret: var("SP_JWT_SECRET"),
+            trust_proxy: var("SP_TRUST_PROXY").map(|v| truthy(&v)).unwrap_or(false),
             endpoints: Endpoints::default(),
             data_dir,
         })
@@ -131,6 +137,8 @@ impl Config {
             },
             google: None,
             twitch_client_id: None,
+            jwt_secret: None,
+            trust_proxy: false,
             endpoints: Endpoints::default(),
             data_dir,
         }

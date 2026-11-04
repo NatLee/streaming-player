@@ -11,6 +11,7 @@
   <img src="https://img.shields.io/badge/server-Rust%20%2B%20axum-b7410e" alt="Server: Rust and axum">
   <img src="https://img.shields.io/badge/web-React%20%2B%20Tailwind-38bdf8" alt="Web: React and Tailwind">
   <img src="https://img.shields.io/badge/docker-one%20image-2496ed" alt="One Docker image">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e" alt="License: MIT"></a>
 </p>
 
 Streaming Player is a self-hosted song request player for live streams. Viewers type `!sr <link>` in chat; the song joins a queue with your rules (length limit, per-person limit, cooldowns, votes, block list); an OBS browser source plays it and a transparent overlay shows what's on. It reads **Twitch** chat and **YouTube** live chat by itself, and any chat bot that can call a URL (Nightbot, StreamElements, Fossabot, Streamer.bot…) can use it too. YouTube plays in YouTube's own embedded player; Bilibili, SoundCloud, direct MP4/M3U8 links and the other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) knows play from the link yt-dlp finds.
@@ -25,8 +26,9 @@ Streaming Player is a self-hosted song request player for live streams. Viewers 
 - **A queue with rules.** Queue size, songs per person, maximum length, duplicates, vote-to-skip and vote-to-bump thresholds, a block list for people and for songs. Moderators can bypass the limits. When the queue is empty, the default playlist (your starred songs) keeps the music going.
 - **Made for OBS.** A player page and a transparent "now playing" overlay, each one browser source. Every open player page stays in sync over WebSocket, and only one of them moves the queue on.
 - **Control while live.** Play, pause, skip, skip and block, volume, reorder, play next, interrupt, remove, block the requester, all from the dashboard or from chat for moderators.
-- **For viewers.** A public queue page (`/queue`) where anyone can look up their own requests.
-- **Keeps v1 working.** The old Nightbot URLs (`/player/nightbot/…`) still answer, and `import-v1` brings your v1 song library and history along. See [moving from v1](docs/migration-v1.md).
+- **For viewers.** A public queue page (`/queue`) where anyone can look up their own requests, and (if you allow it) sign-up at `/register` to request from the web.
+- **Accounts with permissions.** Roles are sets of permission points (control the player, manage the queue, the library, the block list, commands, settings, users). Admin, moderator and viewer are built in; make your own. Programs sign in with access tokens or personal API tokens.
+- **Backups.** Settings, commands and the block list export to one JSON file; the song library to CSV or JSON.
 
 ## Quick start
 
@@ -77,7 +79,6 @@ flowchart LR
     TW["Twitch chat<br/>EventSub + Helix"]
     YT["YouTube live chat<br/>Live Chat API"]
     BOT["Chat bots<br/>Nightbot · StreamElements<br/>Fossabot · Streamer.bot"]
-    V1["v1 Nightbot URLs<br/>/player/nightbot/…"]
   end
   subgraph server [streaming-player]
     CMD["Command engine<br/>words · levels · cooldowns · replies"]
@@ -95,7 +96,6 @@ flowchart LR
   TW --> CMD
   YT --> CMD
   BOT -->|"/api/bot/{command}"| CMD
-  V1 --> CMD
   CMD --> Q
   Q <--> MEDIA
   Q --- DB
@@ -149,7 +149,7 @@ The defaults, all editable on **聊天指令** (prefix `!`, also editable):
 | `!song`, `!現在` | everyone | What's playing, with the link |
 | `!queue`, `!歌單` | everyone | Queue length, next song, viewer page link |
 | `!mysongs`, `!我的歌` | everyone | Your waiting songs and their places |
-| `!songstats`, `!點歌統計` `[name]` | everyone | Request statistics (v1's `count`) |
+| `!songstats`, `!點歌統計` `[name]` | everyone | Request statistics: total, finished, favourite song |
 | `!wrongsong`, `!刪歌` `[id]` | everyone | Remove your own request (moderators: anyone's) |
 | `!voteskip`, `!卡歌` | everyone | Vote to skip (3 votes) |
 | `!bump`, `!插歌` `<id>` | everyone | Vote to play a song next (2 votes) |
@@ -182,11 +182,50 @@ Everything you change while live (rules, commands, chat) is on the admin page. T
 | `SP_BIND` | `0.0.0.0:7878` | Listen address |
 | `SP_DATA_DIR` | `/app/data` | SQLite database (back up this volume) |
 | `SP_TWITCH_CLIENT_ID` | | Default Twitch app client id (the admin page can set it too) |
-| `SP_GOOGLE_CLIENT_ID`, `SP_GOOGLE_CLIENT_SECRET` | | Google sign-in for the admin page, only for emails added on **使用者**; redirect URI `{SP_PUBLIC_URL}/api/auth/google/callback` |
+| `SP_GOOGLE_CLIENT_ID`, `SP_GOOGLE_CLIENT_SECRET` | | Google sign-in; who may sign in follows the registration setting. Redirect URI `{SP_PUBLIC_URL}/api/auth/google/callback` |
+| `SP_JWT_SECRET` | random, kept in the database | Signing key for API access tokens |
+| `SP_TRUST_PROXY` | `false` | `true` when a reverse proxy sets `X-Forwarded-For` (for the registration limit) |
 | `SP_COOKIE_SECURE` | `false` | `true` behind HTTPS |
 | `SP_YTDLP`, `SP_YTDLP_FORMAT`, `SP_YTDLP_TIMEOUT_SECS` | image's yt-dlp, progressive HTTP first, `60` | yt-dlp executable, format selector, time limit |
 
-Command line: `streaming-player reset-password <user> <password>`, `update-ytdlp`, `import-v1 <db.sqlite3>`, `openapi`.
+Command line: `streaming-player reset-password <user> <password>`, `update-ytdlp`, `openapi`.
+
+## Accounts, permissions and API access
+
+Everyone who signs in has a role, and a role is a set of permission points:
+
+| Permission | Lets you |
+|---|---|
+| `player.control` | play, pause, skip, volume (and be an OBS player page with your session) |
+| `queue.view` / `queue.request` | watch the queue / request songs from the web page, under the queue rules |
+| `queue.manage` | reorder, play next, interrupt, remove, add songs without the limits |
+| `library.manage`, `blocklist.manage`, `history.view` | the song library and default playlist, the block list, history and the activity log |
+| `commands.manage` | chat commands and chat connections |
+| `settings.view`, `settings.manage` | read / change rules, playback, OBS key, yt-dlp |
+| `users.manage` | accounts, roles, registration, the audit log |
+
+**admin** has everything and can't be edited, **moderator** runs the player, queue, library and block list, **viewer** watches and requests. Every API and every WebSocket message checks one of these points (a test walks the whole OpenAPI document with a permission-less account), and the last account that can manage users can't be disabled, demoted or deleted. Changes to users and roles go to an audit log on the users page.
+
+<img src="https://raw.githubusercontent.com/NatLee/streaming-player/main/docs/images/users.png" alt="Users and permissions page: two accounts (natlee as 管理員, viewer1 as 協助管理) with role pickers, last sign-in, password reset and disable buttons; a form to add an account; the admin role marked as having every permission, and the moderator role with its permission checkboxes" width="720">
+
+Registration (`/register`) is open by default and gives new accounts the **viewer** role; turn it off or change the role under **設定 → 帳號與註冊**, where the per-address and per-hour limits are too. Google sign-in follows the same switch: open, a first-time Google account gets an account; closed, only emails an admin entered may sign in.
+
+For programs, every API takes `Authorization: Bearer`:
+
+```bash
+# Username and password → a 15-minute access token and a refresh token
+curl -s -H 'content-type: application/json' -d '{"username":"natlee","password":"…"}' \
+  http://localhost:7878/api/auth/token
+# {"access_token":"eyJ…","refresh_token":"8f3…","token_type":"Bearer","expires_in":900,"refresh_expires_in":2592000}
+
+curl -s -X POST -H "Authorization: Bearer eyJ…" http://localhost:7878/api/player/skip
+```
+
+`/api/auth/refresh` trades a refresh token for a new pair (the old one stops working) and `/api/auth/revoke` cancels one. Changing your password or being disabled signs out every session and token. For a Stream Deck or Streamer.bot button, make a **personal API token** (`spat_…`) on **我的帳號**: it never expires unless you say so, and it can only do what you ticked. Details: [users and permissions](docs/users-and-permissions.md).
+
+## Coming from v1
+
+v2 is not compatible with v1: the old `/player/nightbot/…` URLs and the Django database are gone. Replace each Nightbot command with the text the admin page gives you (**聊天室連線**), and rebuild the library or import it as CSV. Steps: [moving from v1](docs/migration-v1.md).
 
 ## Family tree
 
@@ -194,7 +233,7 @@ Command line: `streaming-player reset-password <user> <password>`, `update-ytdlp
 flowchart LR
   A["youtube-video-redirector<br/>Flask · ?v=&lt;id&gt; plays one video<br/>from its direct link"] --> B["youtube-redirect-player<br/>Flask + Socket.IO · Default / Request /<br/>History playlists, synced players"]
   B --> C["streaming-player v1<br/>Django + Channels + nginx · Nightbot<br/>requests, admin, votes"]
-  C --> D["streaming-player v2<br/>Rust + React · Twitch, YouTube and any bot,<br/>OBS player and overlay"]
+  C -. "not compatible" .-> D["streaming-player v2<br/>Rust + React · Twitch, YouTube and any bot,<br/>OBS player and overlay, roles"]
 ```
 
 From [youtube-video-redirector](https://github.com/NatLee/youtube-video-redirector) v2 keeps "play this one video now": `/watch?v=<id>` plays a YouTube video without touching the queue. From [youtube-redirect-player](https://github.com/NatLee/youtube-redirect-player) it keeps the default, request and history lists (default playlist, queue, history) and players synced across devices; history is no longer capped at 200, because the statistics need all of it.
@@ -216,6 +255,10 @@ pnpm dev
 ```
 
 The code is in `src/api` (server) and `src/web` (React). [Pitfalls](docs/pitfalls.md) lists the problems met so far.
+
+## License
+
+[MIT](LICENSE) © 2023 Nat Lee
 
 ## Limits and what isn't verified
 

@@ -1,10 +1,10 @@
 import { ExternalLink, KeyRound, LogIn, LogOut, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { del, errorText, get, post, put } from "../api";
+import { useCan } from "../components/AdminLayout";
 import { ConfirmButton, CopyField, ErrorBox, Field, Loading, Notice, PageHeader, Section, StatusPill, Toggle } from "../components/ui";
 import { botSnippets, botUrl } from "../lib/bots";
 import { ACTION_LABEL } from "../lib/commands";
-import { ago } from "../lib/format";
 import type { ChatInfo, CommandList, Settings, SettingsView } from "../types";
 
 const DOCS = "https://github.com/NatLee/streaming-player/blob/main/docs";
@@ -19,7 +19,7 @@ export function ChatPage() {
   const [apiKey, setApiKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [lastHit, setLastHit] = useState<number | null>(null);
+  const canEdit = useCan()("commands.manage");
 
   const load = useCallback(() => {
     get<SettingsView>("/api/settings")
@@ -30,7 +30,6 @@ export function ChatPage() {
       .catch((e) => setError(errorText(e)));
     get<ChatInfo>("/api/chat").then(setInfo).catch((e) => setError(errorText(e)));
     get<CommandList>("/api/commands").then(setCommands).catch(() => undefined);
-    get<{ legacy_last_hit: number | null }>("/api/system").then((s) => setLastHit(s.legacy_last_hit)).catch(() => undefined);
   }, []);
   useEffect(load, [load]);
 
@@ -64,9 +63,11 @@ export function ChatPage() {
         title="聊天室連線"
         description="觀眾在聊天室打指令點歌。可以直接連 Twitch 和 YouTube 聊天室，也可以讓任何會呼叫網址的聊天機器人來用。"
         actions={
-          <button className="btn btn-primary" onClick={() => save(settings)}>
-            {saved ? "已儲存" : "儲存設定"}
-          </button>
+          canEdit && (
+            <button className="btn btn-primary" onClick={() => save(settings)}>
+              {saved ? "已儲存" : "儲存設定"}
+            </button>
+          )
         }
       />
       {error && <ErrorBox message={error} />}
@@ -249,17 +250,6 @@ export function ChatPage() {
         )}
       </Section>
 
-      <Section
-        title="v1 的 Nightbot 網址"
-        description="舊版的 /player/nightbot/… 網址照樣能用，回覆文字和規則跟新指令一樣。這些網址沒有 key，任何人知道網址就能呼叫；改用上面的新網址後就可以關掉。"
-      >
-        <Toggle
-          checked={settings.legacy_api}
-          onChange={(v) => setSettings({ ...settings, legacy_api: v })}
-          label="接受 v1 的 Nightbot 網址"
-          hint={lastHit ? `最後一次被呼叫：${ago(lastHit)}` : "還沒有被呼叫過"}
-        />
-      </Section>
     </div>
   );
 }

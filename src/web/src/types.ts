@@ -73,19 +73,62 @@ export interface Notice {
   at: number;
 }
 
+export type Perm =
+  | "player.control"
+  | "queue.view"
+  | "queue.request"
+  | "queue.manage"
+  | "library.manage"
+  | "blocklist.manage"
+  | "history.view"
+  | "commands.manage"
+  | "settings.view"
+  | "settings.manage"
+  | "users.manage";
+
 export interface User {
   id: number;
   username: string;
-  role: "admin" | "moderator";
+  role: string;
+  role_label: string;
   email: string | null;
   has_password: boolean;
   google_linked: boolean;
+  disabled: boolean;
+  created_at: number;
+  last_login_at: number | null;
+  permissions: Perm[];
+}
+
+export interface Role {
+  name: string;
+  label: string;
+  permissions: Perm[];
+  builtin: boolean;
+  locked: boolean;
+  users: number;
+}
+
+export interface RoleList {
+  roles: Role[];
+  permissions: { id: Perm; label: string }[];
+  default_role: string;
+}
+
+export interface ApiTokenInfo {
+  id: number;
+  name: string;
+  permissions: Perm[];
+  created_at: number;
+  expires_at: number | null;
+  last_used_at: number | null;
 }
 
 export interface AuthState {
   needs_setup: boolean;
   user: User | null;
   google_enabled: boolean;
+  registration_open: boolean;
 }
 
 export interface QueueRules {
@@ -110,7 +153,16 @@ export interface Settings {
     twitch: { enabled: boolean; client_id: string; channel: string };
     youtube: { enabled: boolean; video: string; poll_secs: number };
   };
-  legacy_api: boolean;
+  auth: AuthSettings;
+}
+
+export interface AuthSettings {
+  registration_open: boolean;
+  default_role: string;
+  register_per_ip_per_hour: number;
+  register_per_hour: number;
+  access_token_minutes: number;
+  refresh_token_days: number;
 }
 
 export interface SettingsView {
@@ -127,7 +179,6 @@ export interface SystemInfo {
   ytdlp_path: string;
   ytdlp_version: string | null;
   ytdlp_error: string | null;
-  legacy_last_hit: number | null;
   players_connected: number;
 }
 

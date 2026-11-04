@@ -6,7 +6,7 @@ use std::{os::unix::fs::PermissionsExt, path::PathBuf, time::Duration};
 use futures_util::{SinkExt, StreamExt};
 use reqwest::{header, Method, StatusCode};
 use serde_json::{json, Value};
-use streaming_player::{app, build_state, chat, config::Config, AppState};
+use streaming_player::{build_state, chat, config::Config, service, AppState};
 use tempfile::TempDir;
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::Message;
@@ -73,8 +73,8 @@ pub async fn start_with(edit: impl FnOnce(&mut Config)) -> TestApp {
     chat::restart(&state);
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
-    let router = app(state.clone());
-    tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+    let svc = service(state.clone());
+    tokio::spawn(async move { axum::serve(listener, svc).await.unwrap() });
     let http = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()

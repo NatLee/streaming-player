@@ -1,8 +1,9 @@
-import { Download, ExternalLink, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Download, ExternalLink, RefreshCw, Upload } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText, get, post, put } from "../api";
+import { useCan } from "../components/AdminLayout";
 import { ConfirmButton, CopyField, ErrorBox, Field, Loading, Notice, NumberField, PageHeader, Section, Toggle } from "../components/ui";
-import type { QueueRules, Settings, SettingsView, SystemInfo, YoutubeMode } from "../types";
+import type { AuthSettings, QueueRules, RoleList, Settings, SettingsView, SystemInfo, YoutubeMode } from "../types";
 
 const DOCS = "https://github.com/NatLee/streaming-player/blob/main/docs";
 
@@ -14,8 +15,10 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [updateOut, setUpdateOut] = useState<string | null>(null);
-  const [pw, setPw] = useState({ current: "", next: "" });
-  const [pwMsg, setPwMsg] = useState<string | null>(null);
+  const [roles, setRoles] = useState<RoleList | null>(null);
+  const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
+  const backupFile = useRef<HTMLInputElement>(null);
+  const can = useCan();
 
   const load = useCallback(() => {
     get<SettingsView>("/api/settings")
@@ -25,12 +28,15 @@ export function SettingsPage() {
       })
       .catch((e) => setError(errorText(e)));
     get<SystemInfo>("/api/system").then(setSystem).catch(() => undefined);
-  }, []);
+    if (can("users.manage")) get<RoleList>("/api/roles").then(setRoles).catch(() => undefined);
+  }, [can]);
   useEffect(load, [load]);
 
   if (!view || !settings) return error ? <ErrorBox message={error} /> : <Loading />;
   const q = settings.queue;
   const setQ = (patch: Partial<QueueRules>) => setSettings({ ...settings, queue: { ...q, ...patch } });
+  const a = settings.auth;
+  const setA = (patch: Partial<AuthSettings>) => setSettings({ ...settings, auth: { ...a, ...patch } });
 
   const save = async () => {
     setError(null);
@@ -49,9 +55,11 @@ export function SettingsPage() {
         title="設定"
         description="點歌規則、播放方式、OBS 網址和系統資訊。改完按「儲存」，所有播放頁會立刻套用。"
         actions={
-          <button className="btn btn-primary" onClick={save}>
-            {saved ? "已儲存" : "儲存設定"}
-          </button>
+          (can("settings.manage") || can("users.manage")) && (
+            <button className="btn btn-primary" onClick={save}>
+              {saved ? "已儲存" : "儲存設定"}
+            </button>
+          )
         }
       />
       {error && <ErrorBox message={error} />}
@@ -207,30 +215,62 @@ export function SettingsPage() {
         )}
       </Section>
 
-      <Section title="我的密碼">
-        <form
-          className="flex flex-wrap items-end gap-3"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setPwMsg(null);
-            try {
-              await post("/api/auth/password", { current: pw.current, new: pw.next });
-              setPw({ current: "", next: "" });
-              setPwMsg("密碼已更新");
-            } catch (err) {
-              setPwMsg(errorText(err));
-            }
-          }}
-        >
-          <Field label="目前的密碼">
-            <input type="password" className="input w-52" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} />
-          </Field>
-          <Field label="新密碼（至少 8 個字元）">
-            <input type="password" className="input w-52" autoComplete="new-password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} />
-          </Field>
-          <button className="btn btn-secondary">更新密碼</button>
-          {pwMsg && <span className="text-sm text-zinc-400">{pwMsg}</span>}
-        </form>
+      {can("users.manage") && (
+        <Section title="帳號與註冊" description="開放註冊時，任何人都能在 /register 建立帳號，第一次用 Google 登入的人也會自動建立帳號；關閉時只有管理員加過的 Email 能用 Google 登入。">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Toggle checked={a.registration_open} onChange={(v) => setA({ registration_open: v })} label="開放註冊" />
+            </div>
+            <Field label="新帳號的預設角色" hint="不能是有「管理使用者」權限的角色">
+              <select className="input w-48" value={a.default_role} onChange={(e) => setA({ default_role: e.target.value })}>
+                {(roles?.roles ?? [{ name: a.default_role, label: a.default_role }]).map((r) => (
+                  <option key={r.name} value={r.name}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <NumberField label="每個 IP 每小時最多註冊" value={a.register_per_ip_per_hour} onChange={(v) => setA({ register_per_ip_per_hour: v })} suffix="個" />
+            <NumberField label="全站每小時最多註冊" value={a.register_per_hour} onChange={(v) => setA({ register_per_hour: v })} suffix="個" />
+            <NumberField label="API access token 有效時間" min={1} value={a.access_token_minutes} onChange={(v) => setA({ access_token_minutes: v })} suffix="分鐘" />
+            <NumberField label="API refresh token 有效時間" min={1} value={a.refresh_token_days} onChange={(v) => setA({ refresh_token_days: v })} suffix="天" />
+          </div>
+        </Section>
+      )}
+
+      <Section title="備份和搬家" description="把設定、聊天指令和黑名單存成一個 JSON 檔，或從檔案還原（設定和指令會被取代，黑名單會加上去）。金鑰和 token 不會存進去。歌曲庫在「歌曲庫」頁另外匯出。">
+        <div className="flex flex-wrap items-center gap-2">
+          <a className="btn btn-secondary" href="/api/backup" download="streaming-player-backup.json">
+            <Download className="size-4" /> 下載備份
+          </a>
+          {can("settings.manage") && (
+            <>
+              <button className="btn btn-secondary" onClick={() => backupFile.current?.click()}>
+                <Upload className="size-4" /> 從備份還原
+              </button>
+              <input
+                ref={backupFile}
+                type="file"
+                accept=".json"
+                hidden
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!f) return;
+                  setRestoreMsg(null);
+                  try {
+                    const r = await post<{ commands: number; blocked_added: number }>("/api/backup", JSON.parse(await f.text()));
+                    setRestoreMsg(`已還原：${r.commands} 個指令，新增 ${r.blocked_added} 個黑名單`);
+                    load();
+                  } catch (err) {
+                    setError(errorText(err));
+                  }
+                }}
+              />
+            </>
+          )}
+        </div>
+        {restoreMsg && <div className="mt-3"><Notice tone="ok">{restoreMsg}</Notice></div>}
       </Section>
     </div>
   );

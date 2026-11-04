@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
-use crate::{db, util::random_hex};
+use crate::{db, perm::Perm, util::random_hex};
 
 const SETTINGS_KEY: &str = "settings";
 pub const OBS_KEY: &str = "obs_key";
@@ -148,27 +148,45 @@ impl Default for ChatSettings {
     }
 }
 
+/// Accounts: registration, and how long API tokens last.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
+#[serde(default)]
+pub struct AuthSettings {
+    /// Anyone can create an account at `/register` (and Google sign-in creates one).
+    pub registration_open: bool,
+    /// Role of new accounts. Must not be able to manage users.
+    pub default_role: String,
+    /// Registrations allowed per client address per hour.
+    pub register_per_ip_per_hour: u32,
+    /// Registrations allowed per hour in total.
+    pub register_per_hour: u32,
+    /// Lifetime of an API access token (JWT), in minutes.
+    pub access_token_minutes: u32,
+    /// Lifetime of an API refresh token, in days.
+    pub refresh_token_days: u32,
+}
+
+impl Default for AuthSettings {
+    fn default() -> Self {
+        Self {
+            registration_open: true,
+            default_role: "viewer".into(),
+            register_per_ip_per_hour: 5,
+            register_per_hour: 30,
+            access_token_minutes: 15,
+            refresh_token_days: 30,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 #[serde(default)]
 pub struct Settings {
     pub queue: QueueRules,
     pub playback: Playback,
     pub viewer: ViewerSettings,
     pub chat: ChatSettings,
-    /// Answer the v1 Nightbot URLs (`/player/nightbot/...`) without a bot key. See `legacy.rs`.
-    pub legacy_api: bool,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            queue: QueueRules::default(),
-            playback: Playback::default(),
-            viewer: ViewerSettings::default(),
-            chat: ChatSettings::default(),
-            legacy_api: true,
-        }
-    }
+    pub auth: AuthSettings,
 }
 
 impl Settings {
@@ -183,8 +201,37 @@ impl Settings {
         if self.queue.skip_votes == 0 || self.queue.bump_votes == 0 {
             return Err("投票門檻至少要 1 票".into());
         }
+        if self.auth.access_token_minutes == 0 || self.auth.refresh_token_days == 0 {
+            return Err("token 的有效時間至少要 1".into());
+        }
         Ok(())
     }
+}
+
+/// Which permission each settings section needs to change. One table instead of a
+/// branch per field; a new section only needs a row here.
+const SECTION_PERMS: &[(&str, Perm)] = &[
+    ("queue", Perm::SettingsManage),
+    ("playback", Perm::SettingsManage),
+    ("viewer", Perm::SettingsManage),
+    ("chat", Perm::CommandsManage),
+    ("auth", Perm::UsersManage),
+];
+
+/// The permissions needed to go from `before` to `after`.
+pub fn required_for_change(before: &Settings, after: &Settings) -> Vec<Perm> {
+    let (b, a) = (
+        serde_json::to_value(before).unwrap_or_default(),
+        serde_json::to_value(after).unwrap_or_default(),
+    );
+    let mut perms: Vec<Perm> = SECTION_PERMS
+        .iter()
+        .filter(|(section, _)| b.get(section) != a.get(section))
+        .map(|(_, p)| *p)
+        .collect();
+    perms.sort();
+    perms.dedup();
+    perms
 }
 
 pub async fn load(db: &SqlitePool) -> Result<Settings> {
@@ -226,7 +273,35 @@ mod tests {
         assert_eq!(s.queue.max_duration_secs, 900, "v1 LIMIT_MINUTES = 15");
         assert_eq!(s.queue.skip_votes, 3, "v1 cut_over_num");
         assert_eq!(s.queue.bump_votes, 2, "v1 insert_over_num");
-        assert!(s.legacy_api);
+        assert!(s.auth.registration_open, "v1 let anyone register");
+        assert_eq!(s.auth.default_role, "viewer");
+    }
+
+    #[test]
+    fn each_section_needs_its_permission() {
+        let before = Settings::default();
+        assert!(required_for_change(&before, &before).is_empty());
+        let mut after = before.clone();
+        after.queue.max_queue = 5;
+        after.chat.prefix = "?".into();
+        assert_eq!(
+            required_for_change(&before, &after),
+            vec![Perm::CommandsManage, Perm::SettingsManage]
+        );
+        let mut after = before.clone();
+        after.auth.registration_open = false;
+        assert_eq!(
+            required_for_change(&before, &after),
+            vec![Perm::UsersManage]
+        );
+        // every section of the document is in the table
+        let doc = serde_json::to_value(&before).unwrap();
+        for key in doc.as_object().unwrap().keys() {
+            assert!(
+                SECTION_PERMS.iter().any(|(s, _)| s == key),
+                "section {key} has no permission"
+            );
+        }
     }
 
     #[test]

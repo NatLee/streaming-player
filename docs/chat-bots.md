@@ -63,16 +63,6 @@ https://your.host/api/bot/sr?key=KEY&user=%user%&args=%rawInputUrlEncoded%
 
 store the result in a variable, and post it with a **Send Message** sub-action.
 
-## v1 Nightbot URLs
-
-v1 told you to set up `!sr` like this:
-
-```
-$(urlfetch https://your.host/player/nightbot/order?user=$(user)&url=$(querystring))
-```
-
-Those URLs still work, see [migration from v1](migration-v1.md#nightbot-urls). They have no key, so switching to the URLs above and then turning off **接受 v1 的 Nightbot 網址** closes that door.
-
 ## Making the server reachable
 
 Bots call from the internet, so `SP_PUBLIC_URL` must be an address they can reach: a domain behind a reverse proxy (Caddy, nginx, Cloudflare Tunnel, …). The built-in Twitch and YouTube connections don't need this; they connect out from the server.

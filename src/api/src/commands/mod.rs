@@ -1,4 +1,4 @@
-//! Chat commands. Every source (Twitch, YouTube, chat bots, the v1 Nightbot URLs) goes
+//! Chat commands. Every source (Twitch, YouTube, chat bots) goes
 //! through the same table of commands, so triggers, permissions, cooldowns and reply
 //! texts are configured once on the admin page.
 
@@ -343,6 +343,29 @@ pub async fn insert(db: &SqlitePool, cmd: &Command) -> Result<i64> {
     .context("insert command")
 }
 
+/// Replace every command at once (restoring a backup).
+pub async fn replace_all(db: &SqlitePool, cmds: &[Command]) -> Result<()> {
+    let mut tx = crate::db::write_tx(db).await?;
+    sqlx::query("DELETE FROM commands")
+        .execute(&mut *tx)
+        .await?;
+    for cmd in cmds {
+        sqlx::query(
+            "INSERT INTO commands (action, triggers, min_level, cooldown_secs, enabled, replies)              VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(cmd.action.as_str())
+        .bind(serde_json::to_string(&cmd.triggers)?)
+        .bind(cmd.min_level.as_str())
+        .bind(cmd.cooldown_secs)
+        .bind(cmd.enabled)
+        .bind(serde_json::to_string(&cmd.replies)?)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn update(db: &SqlitePool, cmd: &Command) -> Result<bool> {
     Ok(sqlx::query(
         "UPDATE commands SET action = ?, triggers = ?, min_level = ?, cooldown_secs = ?, \
@@ -450,6 +473,14 @@ mod tests {
             Action::Request.default_reply("cooldown"),
             Some(COMMON_OUTCOMES[0].1)
         );
+    }
+
+    #[test]
+    fn every_action_has_a_default_command() {
+        let defaults = defaults();
+        for a in ALL_ACTIONS {
+            assert!(defaults.iter().any(|c| c.action == *a), "{a:?}");
+        }
     }
 
     #[test]

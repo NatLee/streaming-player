@@ -44,15 +44,23 @@ describe("QueueList", () => {
   });
 
   it("calls the admin actions", () => {
-    const actions = { move: vi.fn(), playNow: vi.fn(), remove: vi.fn(), favorite: vi.fn() };
+    const actions = { move: vi.fn(), playNow: vi.fn(), remove: vi.fn(), removeAndBlock: vi.fn(), favorite: vi.fn() };
     render(<QueueList items={items} actions={actions} />);
     fireEvent.click(screen.getAllByTitle("移到下一首")[1]);
     expect(actions.move).toHaveBeenCalledWith(items[1], 0);
     fireEvent.click(screen.getAllByTitle("刪除並封鎖點歌者")[0]);
-    expect(actions.remove).toHaveBeenCalledWith(items[0], "user");
+    expect(actions.removeAndBlock).toHaveBeenCalledWith(items[0], "user");
     fireEvent.click(screen.getAllByTitle("立即插播")[0]);
     expect(actions.playNow).toHaveBeenCalledWith(items[0]);
     expect(screen.getAllByTitle("上移")[0]).toBeDisabled();
+  });
+
+  it("shows only the buttons the user may use", () => {
+    render(<QueueList items={items} actions={{ favorite: vi.fn() }} />);
+    expect(screen.getAllByTitle("加入預設播放清單")).toHaveLength(2);
+    expect(screen.queryByTitle("刪除")).toBeNull();
+    expect(screen.queryByTitle("移到下一首")).toBeNull();
+    expect(screen.queryByTitle("刪除並封鎖點歌者")).toBeNull();
   });
 
   it("shows an empty state", () => {

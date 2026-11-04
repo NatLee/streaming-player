@@ -3,10 +3,11 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 use crate::{
-    auth::AdminUser,
+    auth::Can,
     chat::{self, twitch, youtube, Status},
     error::{AppError, AppResult},
     events,
+    perm::need,
     state::AppState,
 };
 
@@ -36,7 +37,10 @@ pub struct ChatInfo {
 }
 
 #[utoipa::path(get, path = "/api/chat", tag = "chat", responses((status = 200, body = ChatInfo)))]
-pub async fn info(State(state): State<AppState>, _admin: AdminUser) -> AppResult<Json<ChatInfo>> {
+pub async fn info(
+    State(state): State<AppState>,
+    _c: Can<need::SettingsView>,
+) -> AppResult<Json<ChatInfo>> {
     let settings = state.settings();
     let device = state.chat.device.lock().unwrap().clone();
     let login = twitch::load_tokens(&state).await?.map(|t| t.login);
@@ -61,7 +65,7 @@ pub async fn info(State(state): State<AppState>, _admin: AdminUser) -> AppResult
 #[utoipa::path(post, path = "/api/chat/twitch/device", tag = "chat", responses((status = 200, body = twitch::DeviceLogin)))]
 pub async fn twitch_device(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    _c: Can<need::CommandsManage>,
 ) -> AppResult<Json<twitch::DeviceLogin>> {
     twitch::start_device(&state)
         .await
@@ -72,7 +76,7 @@ pub async fn twitch_device(
 #[utoipa::path(delete, path = "/api/chat/twitch", tag = "chat", responses((status = 204)))]
 pub async fn twitch_forget(
     State(state): State<AppState>,
-    AdminUser(admin): AdminUser,
+    Can(admin, _): Can<need::CommandsManage>,
 ) -> AppResult<StatusCode> {
     twitch::forget_tokens(&state).await?;
     events::record(&state.db, &admin.username, "chat", "登出 Twitch").await;
@@ -81,7 +85,10 @@ pub async fn twitch_forget(
 }
 
 #[utoipa::path(post, path = "/api/chat/restart", tag = "chat", responses((status = 204)))]
-pub async fn restart(State(state): State<AppState>, _admin: AdminUser) -> AppResult<StatusCode> {
+pub async fn restart(
+    State(state): State<AppState>,
+    _c: Can<need::CommandsManage>,
+) -> AppResult<StatusCode> {
     chat::restart(&state);
     Ok(StatusCode::NO_CONTENT)
 }

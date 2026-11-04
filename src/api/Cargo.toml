@@ -3,6 +3,7 @@ name = "streaming-player"
 version = "2.0.0"
 edition = "2021"
 description = "Self-hosted song request player for live streams: chat requests from Twitch, YouTube and any chat bot, an OBS player and overlay, and a web admin"
+license = "MIT"
 publish = false
 
 [lib]
@@ -20,6 +21,7 @@ axum = { version = "0.8", features = ["ws", "macros"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 data-encoding = "2"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+jsonwebtoken = { version = "9", default-features = false }
 rand = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "gzip"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }

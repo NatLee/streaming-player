@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { del, errorText, get, post, put } from "../api";
+import { useCan } from "../components/AdminLayout";
 import { ConfirmButton, ErrorBox, Loading, Notice, PageHeader, Toggle } from "../components/ui";
 import { ACTION_LABEL, OUTCOME_LABEL } from "../lib/commands";
 import { LEVELS } from "../lib/format";
@@ -11,11 +12,13 @@ function CommandCard({
   info,
   prefix,
   onSaved,
+  readOnly = false,
 }: {
   cmd: Command;
   info: ActionInfo | undefined;
   prefix: string;
   onSaved: () => void;
+  readOnly?: boolean;
 }) {
   const [draft, setDraft] = useState(cmd);
   const [triggers, setTriggers] = useState(cmd.triggers.join(", "));
@@ -83,7 +86,7 @@ function CommandCard({
           {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
           回覆文字 {Object.keys(draft.replies).length > 0 && <span className="chip">已自訂 {Object.keys(draft.replies).length} 則</span>}
         </button>
-        <div className="ml-auto flex items-center gap-2">
+        <div className={`ml-auto flex items-center gap-2 ${readOnly ? "hidden" : ""}`}>
           {cmd.id > 0 && (
             <ConfirmButton className="btn btn-ghost" confirmLabel="確定刪除？" onConfirm={() => del(`/api/commands/${cmd.id}`).then(onSaved)}>
               <Trash2 className="size-4" /> 刪除
@@ -128,6 +131,7 @@ export function CommandsPage() {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState<Action | "">("");
   const [version, setVersion] = useState(0);
+  const readOnly = !useCan()("commands.manage");
 
   const load = useCallback(() => {
     get<CommandList>("/api/commands")
@@ -148,9 +152,11 @@ export function CommandsPage() {
         title="聊天指令"
         description="Twitch、YouTube 聊天室和所有聊天機器人共用這份指令表。每個指令都能改觸發文字、權限、冷卻時間和回覆文字。"
         actions={
-          <ConfirmButton confirmLabel="確定恢復預設？" onConfirm={() => post("/api/commands/reset").then(load)}>
-            <RotateCcw className="size-4" /> 恢復預設
-          </ConfirmButton>
+          !readOnly && (
+            <ConfirmButton confirmLabel="確定恢復預設？" onConfirm={() => post("/api/commands/reset").then(load)}>
+              <RotateCcw className="size-4" /> 恢復預設
+            </ConfirmButton>
+          )
         }
       />
       <div className="mb-4">
@@ -161,7 +167,7 @@ export function CommandsPage() {
       </div>
       <div className="space-y-3" key={version}>
         {data.commands.map((c) => (
-          <CommandCard key={c.id} cmd={c} info={info(c.action)} prefix={data.prefix} onSaved={load} />
+          <CommandCard key={c.id} cmd={c} info={info(c.action)} prefix={data.prefix} onSaved={load} readOnly={readOnly} />
         ))}
         {adding && (
           <CommandCard
@@ -175,7 +181,7 @@ export function CommandsPage() {
           />
         )}
       </div>
-      <div className="mt-4 flex items-center gap-2">
+      <div className={`mt-4 flex items-center gap-2 ${readOnly ? "hidden" : ""}`}>
         <select className="input w-48" value={adding} onChange={(e) => setAdding(e.target.value as Action)}>
           <option value="">新增指令…</option>
           {data.actions.map((a) => (
