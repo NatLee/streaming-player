@@ -1,94 +1,225 @@
-# Streaming Player
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/NatLee/streaming-player/main/docs/images/hero-dark.png">
+    <img src="https://raw.githubusercontent.com/NatLee/streaming-player/main/docs/images/hero-light.png" alt="Streaming Player: Twitch chat, YouTube live chat and any chat bot send song requests to one queue; the queue plays them in an OBS player page and a now-playing overlay">
+  </picture>
+</p>
 
-> Notice that here use package [yt_dlp](https://github.com/yt-dlp/yt-dlp) to get link of video on Youtube.
+<p align="center">
+  <a href="https://github.com/NatLee/streaming-player/actions/workflows/ci.yml"><img src="https://github.com/NatLee/streaming-player/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/version-2.0.0-d9a63a" alt="Version 2.0.0">
+  <img src="https://img.shields.io/badge/server-Rust%20%2B%20axum-b7410e" alt="Server: Rust and axum">
+  <img src="https://img.shields.io/badge/web-React%20%2B%20Tailwind-38bdf8" alt="Web: React and Tailwind">
+  <img src="https://img.shields.io/badge/docker-one%20image-2496ed" alt="One Docker image">
+</p>
 
-![demo](https://github.com/user-attachments/assets/b79bb027-efbd-45ed-bd2a-9f073efb55d9)
+Streaming Player is a self-hosted song request player for live streams. Viewers type `!sr <link>` in chat; the song joins a queue with your rules (length limit, per-person limit, cooldowns, votes, block list); an OBS browser source plays it and a transparent overlay shows what's on. It reads **Twitch** chat and **YouTube** live chat by itself, and any chat bot that can call a URL (Nightbot, StreamElements, Fossabot, Streamer.bot…) can use it too. YouTube plays in YouTube's own embedded player; Bilibili, SoundCloud, direct MP4/M3U8 links and the other sites [yt-dlp](https://github.com/yt-dlp/yt-dlp) knows play from the link yt-dlp finds.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/NatLee/streaming-player/main/docs/images/obs-scene.jpg" width="820" alt="The OBS player page playing Big Buck Bunny, with the transparent now-playing overlay in the corner: title, requester, progress bar, next song, and a pop-up saying Erin requested Sintel">
+</p>
 
-This is an online player can be used on streaming.
+## What it does
 
-### Playlist
+- **Requests from anywhere.** Twitch chat (EventSub, replies in chat), YouTube live chat (Live Chat API with an API key), and a plain HTTP API for chat bots. All of them go through one table of commands whose words, permissions, cooldowns and reply texts you edit on the admin page.
+- **A queue with rules.** Queue size, songs per person, maximum length, duplicates, vote-to-skip and vote-to-bump thresholds, a block list for people and for songs. Moderators can bypass the limits. When the queue is empty, the default playlist (your starred songs) keeps the music going.
+- **Made for OBS.** A player page and a transparent "now playing" overlay, each one browser source. Every open player page stays in sync over WebSocket, and only one of them moves the queue on.
+- **Control while live.** Play, pause, skip, skip and block, volume, reorder, play next, interrupt, remove, block the requester, all from the dashboard or from chat for moderators.
+- **For viewers.** A public queue page (`/queue`) where anyone can look up their own requests.
+- **Keeps v1 working.** The old Nightbot URLs (`/player/nightbot/…`) still answer, and `import-v1` brings your v1 song library and history along. See [moving from v1](docs/migration-v1.md).
 
-![playlist](https://user-images.githubusercontent.com/10178964/213933850-a9dfa041-7d69-4600-8e18-b8b71f026157.png)
+## Quick start
 
-### History
-
-![playlist-history](https://user-images.githubusercontent.com/10178964/213933824-d1545650-901a-4934-a0ea-3cde8ae7b311.png)
-
-### APIs
-
-![apis](https://user-images.githubusercontent.com/10178964/214282464-f4de87b8-ae31-4ed5-9050-b10cb8afa090.png)
-
-## Requirements
-
-```bash
-pip install -r requirements.txt
-```
-
-## Usage
-
-### Quick Start
-
-1. Run the service.
-
-   ```bat
-   docker-compose up
-   ```
-
-2. Go to http://localhost:7878/player/ and create the first user.
-
-   > Port is specified in `docker-compose.yml` file. Default is `7878`.
-
-3. (Optional) Check Admin page.
-
-   Go here http://localhost:7878/api/__hidden_admin .
-      
-   And you'll see the page below.
-   ![](https://user-images.githubusercontent.com/10178964/218362625-839d20df-8350-4082-a25f-501cad8824d8.png)
-
-4. (Optional) Check Swagger.
-
-   Go here http://localhost:7878/api/__hidden_swagger/ .
-
-5. (Optional) Check player in frontend.
-
-   See http://localhost:7878/player/
-
-
-## Interaction APIs
-
-You can use the following APIs in streaming chat box to interact with your audience.
-
-- /player/nightbot/current
-   Get current playing video.
-
-- /player/nightbot/current/poll
-   Poll to stop current playing video.
-
-- /player/nightbot/order
-   Order to play a video.
-
-- /player/nightbot/order/{user}/count
-   Get the number of videos that user has ordered.
-
-- /player/nightbot/{song_pk_in_queue}/delete
-   Delete a video with song's ID in queue.
-
-- /player/nightbot/{song_pk_in_queue}/insert
-   Insert a video with song's ID in queue.
-
-In Nightbot, you can add custom command with URL in [command page](https://nightbot.tv/commands/custom).
-
-Specify command `!sr` and give the message below.
+You need Docker.
 
 ```bash
-$(urlfetch https://<YOUR_DOMAIN>/player/nightbot/order?user=$(user)&url=$(querystring))
+git clone https://github.com/NatLee/streaming-player.git
+cd streaming-player
+docker compose up -d --build
 ```
 
-## Link
+1. Open <http://localhost:7878/>. The first visit creates the admin account.
+2. **設定 → OBS**: copy the player link into an OBS **Browser** source (1920×1080, tick **Control audio via OBS**), and the overlay link into another one (about 640×260). Details: [OBS setup](docs/obs.md).
+3. Connect chat on **聊天室連線**:
+   - Twitch: create a public app, paste its Client ID, press **登入 Twitch** and type the code at twitch.tv/activate. [Twitch setup](docs/twitch.md)
+   - YouTube: paste an API key and the live video's URL. [YouTube setup](docs/youtube.md)
+   - A chat bot: paste the ready-made command text shown there. [Chat bots](docs/chat-bots.md)
+4. Try it from the dashboard's request box, or type `!sr https://youtu.be/…` in chat.
 
-- [Admin](http://localhost:7878/api/__hidden_admin)
+Chat bots call your server from the internet, so for them set `SP_PUBLIC_URL` to an address they can reach (behind a reverse proxy). Twitch and YouTube connections work from `localhost`.
 
-- [Redoc](http://localhost:7878/api/__hidden_redoc)
+## Example
 
-- [Swagger](http://localhost:7878/api/__hidden_swagger)
+A chat bot request is one URL. With Nightbot, a `!sr` command whose message is `$(urlfetch https://your.host/api/bot/sr?key=KEY&args=$(querystring))` answers like this (real replies from a test run; the texts are v1's and can be changed):
+
+```text
+!sr https://www.youtube.com/watch?v=aqz-KE-bpKQ
+NatLee 點播了『Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film』，馬上開始播放！ID是『3』
+
+!點歌 https://commons.wikimedia.org/wiki/File:Big_Buck_Bunny_4K.webm
+小明 無情點播了『Big Buck Bunny 4K』，播放順位是#3，ID是『4』，還要再等25分23秒！
+
+!voteskip
+當前的歌 [Me at the zoo] 已經被 [ Ann , Ben , Cleo ] 投票卡掉！
+```
+
+Or call it yourself:
+
+```bash
+curl "http://localhost:7878/api/bot/sr?key=KEY&user=Alice&args=https%3A%2F%2Fyoutu.be%2FjNQXAC9IVRw"
+```
+
+## How it fits together
+
+```mermaid
+flowchart LR
+  subgraph chat [Chat]
+    TW["Twitch chat<br/>EventSub + Helix"]
+    YT["YouTube live chat<br/>Live Chat API"]
+    BOT["Chat bots<br/>Nightbot · StreamElements<br/>Fossabot · Streamer.bot"]
+    V1["v1 Nightbot URLs<br/>/player/nightbot/…"]
+  end
+  subgraph server [streaming-player]
+    CMD["Command engine<br/>words · levels · cooldowns · replies"]
+    Q["Queue<br/>rules · votes · default playlist"]
+    MEDIA["Media<br/>YouTube oEmbed / Data API<br/>yt-dlp + streaming proxy"]
+    WS(("WebSocket"))
+    DB[("SQLite")]
+  end
+  subgraph pages [Pages]
+    P["OBS player<br/>/obs/player"]
+    O["Overlay<br/>/obs/overlay"]
+    A["Admin<br/>/admin"]
+    VW["Viewers<br/>/queue"]
+  end
+  TW --> CMD
+  YT --> CMD
+  BOT -->|"/api/bot/{command}"| CMD
+  V1 --> CMD
+  CMD --> Q
+  Q <--> MEDIA
+  Q --- DB
+  Q --> WS
+  WS --> P & O & A & VW
+  P -->|"started / ended"| WS
+  A -->|"skip, pause, reorder…"| Q
+```
+
+What happens when someone types `!sr`:
+
+```mermaid
+sequenceDiagram
+  actor Viewer
+  participant Chat as Twitch / YouTube / chat bot
+  participant S as streaming-player
+  participant Site as YouTube oEmbed / yt-dlp
+  participant OBS as OBS player page (leader)
+  participant Ov as Overlay
+  Viewer->>Chat: !sr https://youtu.be/…
+  Chat->>S: command "sr", args, who, level
+  S->>S: permission and cooldown
+  S->>Site: title and length (skipped if the song is known)
+  S->>S: queue rules: open, blocked, too long, duplicate, limits
+  S-->>Chat: 「播放順位是#3，還要再等4分30秒」
+  S-->>OBS: state (queue changed)
+  S-->>Ov: notice「Viewer 點了『…』」
+  Note over OBS: when the song before it ends
+  OBS->>S: ended {request_id}
+  S-->>OBS: state: the request is on air
+  OBS->>S: started {request_id, position}
+```
+
+More in [how it works](docs/architecture.md): the playback sync, the media paths and the WebSocket messages.
+
+## The pages
+
+| Admin dashboard (`/admin`) | Viewer page (`/queue`) |
+|---|---|
+| <img src="https://raw.githubusercontent.com/NatLee/streaming-player/main/docs/images/admin-dashboard.png" alt="Admin dashboard: the song on air with play, pause, skip, skip-and-block, default-playlist and volume controls; the request box; the queue with move, play next, interrupt, favorite, copy, remove and block buttons; the activity log"> | <img src="https://raw.githubusercontent.com/NatLee/streaming-player/main/docs/images/viewer.png" alt="Viewer page: now playing, a box to look up your own requests (Mika's waiting and past songs), and the queue with positions and waiting times"> |
+
+The admin pages also cover the song library (default playlist, block list, songs that went missing, CSV/JSON import and export), request history with per-person statistics, the chat commands, the chat connections, settings and users. The HTTP API is in Swagger UI at `/api/docs/`.
+
+## Chat commands
+
+The defaults, all editable on **聊天指令** (prefix `!`, also editable):
+
+| Command | Who | Does |
+|---|---|---|
+| `!sr`, `!點歌`, `!songrequest` `<link or words>` | everyone | Request a song |
+| `!song`, `!現在` | everyone | What's playing, with the link |
+| `!queue`, `!歌單` | everyone | Queue length, next song, viewer page link |
+| `!mysongs`, `!我的歌` | everyone | Your waiting songs and their places |
+| `!songstats`, `!點歌統計` `[name]` | everyone | Request statistics (v1's `count`) |
+| `!wrongsong`, `!刪歌` `[id]` | everyone | Remove your own request (moderators: anyone's) |
+| `!voteskip`, `!卡歌` | everyone | Vote to skip (3 votes) |
+| `!bump`, `!插歌` `<id>` | everyone | Vote to play a song next (2 votes) |
+| `!skip`, `!切歌` | moderators | Skip now |
+| `!pause` / `!resume` | moderators | Pause or resume every player |
+| `!songhelp` | everyone | List the commands this person may use |
+
+## Where songs come from
+
+| You type | Looked up with | Plays with |
+|---|---|---|
+| A YouTube link or id | YouTube Data API if you set a key (gives the length), otherwise YouTube's oEmbed (title only; the player reports the length) | YouTube's IFrame Player API |
+| A YouTube video whose uploader disabled embedding | yt-dlp | yt-dlp's link through this server (experimental, see below) |
+| Bilibili, SoundCloud, Wikimedia Commons, direct `.mp4`/`.webm`/`.mp3`/`.m3u8`… | yt-dlp | yt-dlp's link: files stream through this server, HLS plays with hls.js |
+| Words | yt-dlp YouTube search (first result) | YouTube's IFrame Player API |
+
+Tested by hand in headless Edge: a YouTube embed playing to the end and the queue moving on, a Wikimedia Commons video, SoundCloud (HLS) and Bilibili through yt-dlp. Bilibili and SoundCloud have no separate picture track the browser can use, so they play as audio with the cover art.
+
+**YouTube from its direct link is experimental.** YouTube often refuses links that don't come from its own player, and after a burst of lookups it asks to "confirm you're not a bot" for a while. That's why YouTube metadata comes from oEmbed or the Data API, and yt-dlp is only the fallback for videos that can't be embedded.
+
+yt-dlp ships in the image at a pinned version; **設定 → 系統 → 更新 yt-dlp** updates it when a site changes.
+
+## Configuration
+
+Everything you change while live (rules, commands, chat) is on the admin page. The container itself takes a few environment variables:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SP_PUBLIC_URL` | `http://localhost:7878` | The address chat bots and OBS use; shown in the ready-made links |
+| `SP_BIND` | `0.0.0.0:7878` | Listen address |
+| `SP_DATA_DIR` | `/app/data` | SQLite database (back up this volume) |
+| `SP_TWITCH_CLIENT_ID` | | Default Twitch app client id (the admin page can set it too) |
+| `SP_GOOGLE_CLIENT_ID`, `SP_GOOGLE_CLIENT_SECRET` | | Google sign-in for the admin page, only for emails added on **使用者**; redirect URI `{SP_PUBLIC_URL}/api/auth/google/callback` |
+| `SP_COOKIE_SECURE` | `false` | `true` behind HTTPS |
+| `SP_YTDLP`, `SP_YTDLP_FORMAT`, `SP_YTDLP_TIMEOUT_SECS` | image's yt-dlp, progressive HTTP first, `60` | yt-dlp executable, format selector, time limit |
+
+Command line: `streaming-player reset-password <user> <password>`, `update-ytdlp`, `import-v1 <db.sqlite3>`, `openapi`.
+
+## Family tree
+
+```mermaid
+flowchart LR
+  A["youtube-video-redirector<br/>Flask · ?v=&lt;id&gt; plays one video<br/>from its direct link"] --> B["youtube-redirect-player<br/>Flask + Socket.IO · Default / Request /<br/>History playlists, synced players"]
+  B --> C["streaming-player v1<br/>Django + Channels + nginx · Nightbot<br/>requests, admin, votes"]
+  C --> D["streaming-player v2<br/>Rust + React · Twitch, YouTube and any bot,<br/>OBS player and overlay"]
+```
+
+From [youtube-video-redirector](https://github.com/NatLee/youtube-video-redirector) v2 keeps "play this one video now": `/watch?v=<id>` plays a YouTube video without touching the queue. From [youtube-redirect-player](https://github.com/NatLee/youtube-redirect-player) it keeps the default, request and history lists (default playlist, queue, history) and players synced across devices; history is no longer capped at 200, because the statistics need all of it.
+
+## Development
+
+The server builds and tests in Docker; no local Rust needed.
+
+```bash
+# Server: format, lint, tests (fake yt-dlp, fake Twitch and YouTube servers)
+docker run --rm -v "$PWD:/src" -w /src/src/api rust:1-trixie \
+  sh -c "rustup component add rustfmt clippy && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test"
+
+# Web app: tests and build (Node 24)
+cd src/web && pnpm install && pnpm test && pnpm build
+
+# Run the web app against a server on :7878 with hot reload
+pnpm dev
+```
+
+The code is in `src/api` (server) and `src/web` (React). [Pitfalls](docs/pitfalls.md) lists the problems met so far.
+
+## Limits and what isn't verified
+
+- The Twitch and YouTube chat connections are tested against fake servers that follow the documented messages. They haven't been run against a real Twitch channel or a real YouTube live stream yet.
+- YouTube live chat with an API key is read-only: replies can't be posted there. They show up in the activity log, and accepted requests pop up on the overlay.
+- Playing YouTube from yt-dlp's direct link may fail (see above). The embedded player is the supported way.
+- Bilibili plays without picture, and many of its videos are geo-restricted.
