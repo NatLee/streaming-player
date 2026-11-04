@@ -1,0 +1,53 @@
+[package]
+name = "streaming-player"
+version = "2.0.0"
+edition = "2021"
+description = "Self-hosted song request player for live streams: chat requests from Twitch, YouTube and any chat bot, an OBS player and overlay, and a web admin"
+publish = false
+
+[lib]
+name = "streaming_player"
+path = "src/lib.rs"
+
+[[bin]]
+name = "streaming-player"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+argon2 = "0.5"
+axum = { version = "0.8", features = ["ws", "macros"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+data-encoding = "2"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "gzip"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate"] }
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "0.26", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+tokio-util = "0.7"
+tower-http = { version = "0.6", features = ["fs", "trace", "set-header"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
+utoipa = { version = "5", features = ["axum_extras"] }
+utoipa-axum = "0.2"
+utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
+
+[dev-dependencies]
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }
+
+# Password hashing is slow in unoptimized builds; keep tests fast.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+strip = true
