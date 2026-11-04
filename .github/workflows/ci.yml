@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: Server (Rust)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/api
+      - name: Format
+        run: cargo fmt --check
+      - name: Lint
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Test (queue rules, commands, v1 URLs, WebSocket, fake Twitch and YouTube)
+        run: cargo test --locked
+
+  web:
+    name: Web (React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: src/web/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: src/web/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Test
+        run: pnpm test
+      - name: Type-check and build
+        run: pnpm build
+
+  docker:
+    name: Docker image
+    needs: [api, web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: streaming-player:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test
+        run: |
+          set -e
+          docker run -d --name sp -p 7878:7878 streaming-player:ci
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:7878/api/health && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:7878/api/meta
+          curl -fsS http://127.0.0.1:7878/ | grep -q '<div id="root">'
+          curl -fsS http://127.0.0.1:7878/api/openapi.json | grep -q '/player/nightbot/order'
+          docker exec sp /opt/yt-dlp/yt-dlp --version
+          docker exec sp deno --version
+
+          # First run: create the admin, then go through a real request with yt-dlp:
+          # a direct MP3 link, resolved in the container and streamed through the server.
+          curl -fsS -c jar -H 'content-type: application/json' \
+            -d '{"username":"admin","password":"ci-password-1"}' http://127.0.0.1:7878/api/auth/setup
+          mp3="https://raw.githubusercontent.com/ggml-org/whisper.cpp/v1.9.5/samples/jfk.mp3"
+          curl -fsS -b jar -H 'content-type: application/json' \
+            -d "{\"input\":\"$mp3\"}" http://127.0.0.1:7878/api/queue | tee added.json
+          song=$(curl -fsS -b jar http://127.0.0.1:7878/api/queue | python3 -c 'import json,sys; print(json.load(sys.stdin)["now"]["song"]["id"])')
+          curl -fsS -b jar "http://127.0.0.1:7878/api/media/$song/source" | tee source.json
+          grep -q '"kind":"file"' source.json
+          code=$(curl -s -o part.bin -w '%{http_code}' -b jar -H 'Range: bytes=0-99' "http://127.0.0.1:7878/api/media/$song/stream")
+          test "$code" = 206
+          test "$(wc -c < part.bin)" = 100
+
+          # The v1 Nightbot URL still answers in plain text.
+          curl -fsS http://127.0.0.1:7878/player/nightbot/current | tee current.txt
+          grep -q 'jfk' current.txt
+          docker logs sp

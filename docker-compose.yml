@@ -1,0 +1,25 @@
+services:
+  streaming-player:
+    build: .
+    image: streaming-player:latest
+    container_name: streaming-player
+    restart: unless-stopped
+    ports:
+      # v1 used 7878 too, so old Nightbot commands keep their address
+      - "7878:7878"
+    volumes:
+      # SQLite database, chat sign-ins and keys live here; back it up
+      - streaming-player-data:/app/data
+    environment:
+      # The address chat bots and OBS use to reach this server (shown on the admin page)
+      SP_PUBLIC_URL: ${SP_PUBLIC_URL:-http://localhost:7878}
+      # Optional: default Twitch application client id (the admin page can set it too)
+      SP_TWITCH_CLIENT_ID: ${SP_TWITCH_CLIENT_ID:-}
+      # Optional Google sign-in; put the values in a .env file next to this one
+      SP_GOOGLE_CLIENT_ID: ${SP_GOOGLE_CLIENT_ID:-}
+      SP_GOOGLE_CLIENT_SECRET: ${SP_GOOGLE_CLIENT_SECRET:-}
+      # Behind an HTTPS reverse proxy: send the sign-in cookie over HTTPS only
+      # SP_COOKIE_SECURE: "true"
+
+volumes:
+  streaming-player-data:
