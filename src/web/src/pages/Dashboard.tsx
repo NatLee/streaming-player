@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { del, errorText, get, patch, post, put } from "../api";
 import { NowPlayingCard } from "../components/NowPlayingCard";
+import { useCan } from "../components/AdminLayout";
 import { Player } from "../components/Player";
 import { QueueList, type QueueActions } from "../components/QueueList";
 import { ConfirmButton, ErrorBox, Loading, Notice, PageHeader } from "../components/ui";
@@ -31,6 +32,7 @@ const PLACEMENTS: { value: Placement; label: string }[] = [
 
 export function Dashboard() {
   const live = useLive("admin");
+  const can = useCan();
   const elapsed = useElapsed(live);
   const [input, setInput] = useState("");
   const [placement, setPlacement] = useState<Placement>("end");
@@ -48,9 +50,10 @@ export function Dashboard() {
   const signature = state
     ? [state.now?.id, state.player.paused, state.requests_open, ...state.queue.map((q) => q.id)].join(",")
     : "";
+  const seeHistory = can("history.view");
   useEffect(() => {
-    get<ActivityEvent[]>("/api/events?limit=15").then(setEvents).catch(() => undefined);
-  }, [signature]);
+    if (seeHistory) get<ActivityEvent[]>("/api/events?limit=15").then(setEvents).catch(() => undefined);
+  }, [signature, seeHistory]);
 
   const run = useCallback(async (fn: () => Promise<unknown>) => {
     try {
@@ -79,12 +82,19 @@ export function Dashboard() {
     }
   };
 
+  // Only the buttons this user may use (the server checks again).
+  const manage = can("queue.manage");
   const actions: QueueActions = {
-    move: (item, index) => run(() => post(`/api/queue/${item.id}/move`, { index })),
-    playNow: (item) => run(() => post(`/api/queue/${item.id}/play-now`)),
-    remove: (item, block) => run(() => del(`/api/queue/${item.id}${block ? `?block=${block}` : ""}`)),
-    favorite: (item) => run(() => patch(`/api/library/${item.song.id}`, { favorite: !item.song.favorite })),
+    move: manage ? (item, index) => run(() => post(`/api/queue/${item.id}/move`, { index })) : undefined,
+    playNow: manage ? (item) => run(() => post(`/api/queue/${item.id}/play-now`)) : undefined,
+    remove: manage ? (item) => run(() => del(`/api/queue/${item.id}`)) : undefined,
+    removeAndBlock:
+      manage && can("blocklist.manage") ? (item, block) => run(() => del(`/api/queue/${item.id}?block=${block}`)) : undefined,
+    favorite: can("library.manage")
+      ? (item) => run(() => patch(`/api/library/${item.song.id}`, { favorite: !item.song.favorite }))
+      : undefined,
   };
+  const control = can("player.control");
 
   const toggleRequests = () =>
     run(async () => {
@@ -105,9 +115,13 @@ export function Dashboard() {
               <Tv className="size-3.5" />
               {state.players_connected ? `${state.players_connected} 個播放頁連線中` : "沒有播放頁連線"}
             </span>
-            <button className={`btn ${state.requests_open ? "btn-secondary" : "btn-danger"}`} onClick={toggleRequests}>
-              {state.requests_open ? "點歌開放中" : "點歌已關閉"}
-            </button>
+            {can("settings.manage") ? (
+              <button className={`btn ${state.requests_open ? "btn-secondary" : "btn-danger"}`} onClick={toggleRequests}>
+                {state.requests_open ? "點歌開放中" : "點歌已關閉"}
+              </button>
+            ) : (
+              <span className="chip">{state.requests_open ? "點歌開放中" : "點歌已關閉"}</span>
+            )}
           </>
         }
       />
@@ -121,6 +135,7 @@ export function Dashboard() {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
           <NowPlayingCard now={now} elapsedMs={elapsed} next={state.queue[0]} paused={state.player.paused} size="lg" />
+          {control && (
           <div className="card flex flex-wrap items-center gap-2 p-3">
             {state.player.paused ? (
               <button className="btn btn-primary" onClick={() => run(() => post("/api/player/resume"))}>
@@ -134,14 +149,16 @@ export function Dashboard() {
             <button className="btn btn-secondary" disabled={!now} onClick={() => run(() => post("/api/player/skip", { block: false }))}>
               <SkipForward className="size-4" /> 跳過
             </button>
-            <ConfirmButton
-              title="跳過並把這首歌加入黑名單"
-              confirmLabel="確定封鎖？"
-              onConfirm={() => run(() => post("/api/player/skip", { block: true }))}
-            >
-              <Ban className="size-4" /> 跳過並封鎖
-            </ConfirmButton>
-            {now && (
+            {can("blocklist.manage") && (
+              <ConfirmButton
+                title="跳過並把這首歌加入黑名單"
+                confirmLabel="確定封鎖？"
+                onConfirm={() => run(() => post("/api/player/skip", { block: true }))}
+              >
+                <Ban className="size-4" /> 跳過並封鎖
+              </ConfirmButton>
+            )}
+            {now && can("library.manage") && (
               <button
                 className={`btn btn-secondary ${now.song.favorite ? "text-gold-300" : ""}`}
                 onClick={() => run(() => patch(`/api/library/${now.song.id}`, { favorite: !now.song.favorite }))}
@@ -178,6 +195,7 @@ export function Dashboard() {
               <span className="w-8 text-right text-xs text-zinc-400 tabular-nums">{dragVolume ?? state.player.volume}</span>
             </div>
           </div>
+          )}
 
           {preview && (
             <div className="card overflow-hidden">
@@ -187,6 +205,7 @@ export function Dashboard() {
             </div>
           )}
 
+          {can("queue.request") && (
           <form onSubmit={add} className="card flex flex-wrap items-center gap-2 p-3">
             <input
               className="input min-w-64 flex-1"
@@ -194,17 +213,20 @@ export function Dashboard() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
-            <select className="input w-32" value={placement} onChange={(e) => setPlacement(e.target.value as Placement)}>
-              {PLACEMENTS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
+            {manage && (
+              <select className="input w-32" value={placement} onChange={(e) => setPlacement(e.target.value as Placement)}>
+                {PLACEMENTS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            )}
             <button className="btn btn-primary" disabled={busy}>
               <ListPlus className="size-4" /> 點歌
             </button>
           </form>
+          )}
           {message &&
             (message.ok ? <Notice tone="ok">{message.text}</Notice> : <ErrorBox message={message.text} />)}
 
@@ -218,7 +240,7 @@ export function Dashboard() {
                   {preview ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   {preview ? "關閉預覽" : "預覽畫面"}
                 </button>
-                {state.queue.length > 0 && (
+                {manage && state.queue.length > 0 && (
                   <ConfirmButton className="btn btn-ghost" confirmLabel="確定清空？" onConfirm={() => run(() => post("/api/queue/clear"))}>
                     <Trash2 className="size-4" /> 清空
                   </ConfirmButton>
@@ -229,6 +251,7 @@ export function Dashboard() {
           </section>
         </div>
 
+        {seeHistory && (
         <aside className="card h-fit p-4">
           <h2 className="mb-3 font-semibold">最近動態</h2>
           <ul className="space-y-2.5">
@@ -243,6 +266,7 @@ export function Dashboard() {
             {events.length === 0 && <li className="text-sm text-zinc-500">還沒有任何動態</li>}
           </ul>
         </aside>
+        )}
       </div>
     </div>
   );

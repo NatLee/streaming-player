@@ -3,19 +3,19 @@ import { useCallback, useEffect, useState } from "react";
 import { del, errorText, get, patch, post } from "../api";
 import { Empty, ErrorBox, PageHeader, Section, Thumb } from "../components/ui";
 import { when } from "../lib/format";
-import type { BlockedUser, LibrarySong, Page } from "../types";
+import type { BlockedUser, Song } from "../types";
 
 export function BlocklistPage() {
   const [users, setUsers] = useState<BlockedUser[]>([]);
-  const [songs, setSongs] = useState<LibrarySong[]>([]);
+  const [songs, setSongs] = useState<Song[]>([]);
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     get<BlockedUser[]>("/api/blocklist").then(setUsers).catch((e) => setError(errorText(e)));
-    get<Page<LibrarySong>>("/api/library?filter=blocked&limit=500")
-      .then((p) => setSongs(p.items))
+    get<Song[]>("/api/blocklist/songs")
+      .then(setSongs)
       .catch((e) => setError(errorText(e)));
   }, []);
   useEffect(load, [load]);

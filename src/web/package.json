@@ -2,6 +2,7 @@
   "name": "streaming-player-web",
   "private": true,
   "version": "2.0.0",
+  "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.6.5",
   "scripts": {
