@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", ui-sans-serif, system-ui,
+    sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* v1's gold, kept as the accent */
+  --color-gold-300: #f6d98f;
+  --color-gold-400: #f0c35a;
+  --color-gold-500: #d9a63a;
+  --color-gold-600: #b8862a;
+  --color-ink-950: #0b0b10;
+  --color-ink-900: #121219;
+  --color-ink-850: #171720;
+  --color-ink-800: #1e1e29;
+  --color-ink-700: #2b2b38;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-ink-950 text-zinc-100 antialiased;
+  }
+  /* OBS browser sources: nothing but the content itself */
+  body.transparent {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-white/8 bg-ink-900/90 shadow-lg shadow-black/20;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-400 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-gold-400 text-ink-950 hover:bg-gold-300;
+  }
+  .btn-secondary {
+    @apply border border-white/10 bg-ink-800 text-zinc-200 hover:bg-ink-700;
+  }
+  .btn-danger {
+    @apply bg-red-500/90 text-white hover:bg-red-500;
+  }
+  .btn-ghost {
+    @apply text-zinc-300 hover:bg-white/8;
+  }
+  .icon-btn {
+    @apply inline-flex size-8 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 disabled:opacity-40;
+  }
+  .input {
+    @apply w-full rounded-lg border border-white/10 bg-ink-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-gold-400 focus:ring-2 focus:ring-gold-400/25 focus:outline-none disabled:opacity-60;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-zinc-300;
+  }
+  .hint {
+    @apply mt-1 text-xs text-zinc-500;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-0.5 text-xs text-zinc-300;
+  }
+  .th {
+    @apply px-3 py-2 text-left text-xs font-semibold tracking-wide text-zinc-500;
+  }
+  .td {
+    @apply px-3 py-2 align-middle text-sm;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.toast-in {
+  animation: toast-in 0.35s ease-out both;
+}
+
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.eq-bar {
+  transform-origin: bottom;
+  animation: eq 1s ease-in-out infinite;
+}
