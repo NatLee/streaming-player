@@ -77,9 +77,7 @@ pub enum Source {
     Youtube,
     /// The generic chat-bot HTTP API (Nightbot, StreamElements, Fossabot, Streamer.bot…)
     Bot,
-    /// v1 Nightbot URLs
-    Legacy,
-    /// Someone signed in to the admin page
+    /// Someone signed in to the web page
     Web,
     /// Picked from the default playlist because the queue was empty
     Autoplay,
@@ -91,7 +89,6 @@ impl Source {
             Source::Twitch => "twitch",
             Source::Youtube => "youtube",
             Source::Bot => "bot",
-            Source::Legacy => "legacy",
             Source::Web => "web",
             Source::Autoplay => "autoplay",
         }

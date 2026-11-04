@@ -309,90 +309,6 @@ async fn votes_skip_and_bump_like_v1() {
 }
 
 #[tokio::test]
-async fn legacy_nightbot_urls_keep_working() {
-    let mut t = start().await;
-    let (s, r) = t.get_text("/player/nightbot/current").await;
-    assert_eq!((s, r.as_str()), (StatusCode::OK, "現在佇列沒有歌哦！"));
-
-    let order = |user: &str, url: &str| {
-        format!(
-            "/player/nightbot/order?user={user}&url={}",
-            url::form_urlencoded::byte_serialize(url.as_bytes()).collect::<String>()
-        )
-    };
-    let (_, r) = t.get_text(&order("Alice", &yt(A))).await;
-    assert!(r.contains("Alice 點播了"), "{r}");
-    let (_, r) = t.get_text(&order("Bob", &yt(B))).await;
-    assert!(
-        r.starts_with("Bob 無情點播了『Video BBBBBBBBBB2』，播放順位是#2，ID是『"),
-        "{r}"
-    );
-    let (_, r) = t.get_text("/player/nightbot/order?url=x").await;
-    assert_eq!(r, "記得要填使用者！");
-
-    let q = t.queue().await;
-    let b_id = q["queue"][0]["id"].as_i64().unwrap();
-    let (_, r) = t
-        .get_text(&format!("/player/nightbot/{b_id}/delete?user=Carol"))
-        .await;
-    assert_eq!(r, "Carol，不要砍別人點的歌！這首是 Bob 點的");
-    let (_, r) = t
-        .get_text(&format!("/player/nightbot/{b_id}/delete?user=Bob"))
-        .await;
-    assert_eq!(r, "Bob 無情砍了 #2 『Video BBBBBBBBBB2』");
-    let (_, r) = t.get_text("/player/nightbot/999/delete?user=Bob").await;
-    assert_eq!(r, "Bob，現在的佇列沒有這首歌啊！");
-
-    for v in ["a", "b"] {
-        t.get_text(&format!("/player/nightbot/current/poll?user={v}"))
-            .await;
-    }
-    let (_, r) = t.get_text("/player/nightbot/current/poll?user=c").await;
-    assert!(r.contains("投票卡掉"), "{r}");
-
-    let (_, r) = t.get_text("/player/nightbot/order/Alice/count").await;
-    assert_eq!(
-        r,
-        "Alice 點歌次數有 1 次，播完的比例有 0.00 %，總共 0 秒，不重複的歌有 1 首，最常點播的歌是 [Video AAAAAAAAAA1] ，高達 1 次"
-    );
-    let (_, r) = t.get_text("/player/nightbot/order/nobody/count").await;
-    assert_eq!(r, "nobody 這個人沒有點過歌哦！");
-
-    t.get_text(&order("Alice", &yt(A))).await;
-    t.get_text(&order("Bob", &yt(B))).await;
-    t.get_text(&order("Carol", &yt(C))).await;
-    let q = t.queue().await;
-    let c_id = q["queue"][1]["id"].as_i64().unwrap();
-    t.get_text(&format!("/player/nightbot/{c_id}/insert?user=x"))
-        .await;
-    let (_, r) = t
-        .get_text(&format!("/player/nightbot/{c_id}/insert?user=y"))
-        .await;
-    assert!(r.contains("投票成功插歌"), "{r}");
-
-    let (s, body) = t.get_text("/player/playlist/queue").await;
-    assert_eq!(s, StatusCode::OK);
-    let items: Value = serde_json::from_str(&body).unwrap();
-    assert_eq!(items[0]["order"], 1);
-    assert_eq!(items[1]["song_name"], format!("Video {C}"));
-    assert!(items[1]["created_at"].as_str().unwrap().contains('T'));
-
-    let (_, r) = t.get_text("/player/ping").await;
-    assert!(r.contains("pong"));
-    let (s, h, _) = t.raw(Method::GET, "/api/__hidden_admin/", None, None).await;
-    assert_eq!(s, StatusCode::PERMANENT_REDIRECT);
-    assert_eq!(h.get("location").unwrap(), "/admin");
-
-    // The last use is shown on the settings page, and the switch turns them off.
-    let (_, sys) = t.call(Method::GET, "/api/system", None).await;
-    assert!(sys["legacy_last_hit"].as_i64().unwrap() > 0);
-    assert_eq!(sys["ytdlp_version"], "2026.10.26");
-    t.put_settings(|s| s["legacy_api"] = json!(false)).await;
-    let (s, _) = t.get_text("/player/nightbot/current").await;
-    assert_eq!(s, StatusCode::GONE);
-}
-
-#[tokio::test]
 async fn admin_queue_controls() {
     let mut t = start().await;
     for (input, placement) in [
@@ -853,7 +769,7 @@ async fn openapi_document_is_complete() {
     let paths = doc["paths"].as_object().unwrap();
     for p in [
         "/api/bot/{command}",
-        "/player/nightbot/order",
+        "/api/auth/token",
         "/api/queue",
         "/api/ws",
         "/api/settings",
@@ -889,64 +805,6 @@ fn collect_refs(v: &Value, out: &mut Vec<String>) {
         Value::Array(a) => a.iter().for_each(|v| collect_refs(v, out)),
         _ => {}
     }
-}
-
-#[tokio::test]
-async fn imports_a_v1_database_once() {
-    let mut t = start().await;
-    // The two v1 tables the import reads (Django's playlist / playlist_order_history).
-    let path = t.path("v1.sqlite3");
-    let v1 = sqlx::SqlitePool::connect_with(
-        sqlx::sqlite::SqliteConnectOptions::new()
-            .filename(&path)
-            .create_if_missing(true),
-    )
-    .await
-    .unwrap();
-    for sql in [
-        "CREATE TABLE playlist (id integer PRIMARY KEY, song_name varchar(255), url varchar(512), created_at datetime, last_played_at datetime, duration integer, favorite bool, block bool, missing bool)",
-        "CREATE TABLE playlist_order_history (id integer PRIMARY KEY, playlist_id bigint, user varchar(128), created_at datetime, played bool, cut bool, autoplay bool)",
-        "INSERT INTO playlist VALUES (1, '小幸運', 'https://www.youtube.com/watch?v=AAAAAAAAAA1', '2023-01-22 12:00:00.123456', '2023-01-22 12:00:00', 265, 1, 0, 0)",
-        "INSERT INTO playlist VALUES (2, 'Blocked one', 'https://youtu.be/BBBBBBBBBB2', '2023-01-22 12:00:00', '2023-01-22 12:00:00', 100, 0, 1, 0)",
-        "INSERT INTO playlist VALUES (3, 'broken', 'not a link', '2023-01-22 12:00:00', '2023-01-22 12:00:00', 0, 0, 0, 0)",
-        "INSERT INTO playlist_order_history VALUES (1, 1, 'Alice', '2023-01-22 12:01:00.5', 1, 0, 0)",
-        "INSERT INTO playlist_order_history VALUES (2, 1, 'Alice', '2023-01-23 12:01:00', 0, 1, 0)",
-        "INSERT INTO playlist_order_history VALUES (3, 3, 'Bob', '2023-01-23 12:01:00', 1, 0, 0)",
-    ] {
-        sqlx::query(sql).execute(&v1).await.unwrap();
-    }
-    v1.close().await;
-
-    let report = streaming_player::legacy::import_v1(&t.state, &path)
-        .await
-        .unwrap();
-    assert_eq!((report.songs, report.requests, report.skipped), (2, 2, 2));
-    assert!(
-        streaming_player::legacy::import_v1(&t.state, &path)
-            .await
-            .is_err(),
-        "only once"
-    );
-
-    let (_, fav) = t
-        .call(Method::GET, "/api/library?filter=favorite", None)
-        .await;
-    assert_eq!(fav["items"][0]["title"], "小幸運");
-    assert_eq!(fav["items"][0]["duration_secs"], 265);
-    let (_, blocked) = t
-        .call(Method::GET, "/api/library?filter=blocked", None)
-        .await;
-    assert_eq!(blocked["total"], 1);
-    let (_, r) = t.get_text("/player/nightbot/order/Alice/count").await;
-    assert_eq!(
-        r,
-        "Alice 點歌次數有 2 次，播完的比例有 50.00 %，總共 4 分 25 秒，不重複的歌有 1 首，最常點播的歌是 [小幸運] ，高達 2 次"
-    );
-    let (_, h) = t.call(Method::GET, "/api/history?user=alice", None).await;
-    assert_eq!(
-        h["items"][1]["requested_at"], 1674388860,
-        "2023-01-22 12:01:00 UTC"
-    );
 }
 
 async fn fake_oembed(
@@ -1015,10 +873,11 @@ async fn links_split_at_ampersands_are_put_back_together() {
     );
     let r = t.http.get(url).send().await.unwrap().text().await.unwrap();
     assert!(r.contains(&format!("『Video {A}』")), "{r}");
-    let (_, r) = t
-        .get_text(&format!(
-            "/player/nightbot/order?user=Yan&url=https://www.youtube.com/watch?list=PL1&v={B}"
-        ))
-        .await;
+    // The same through the "q" name.
+    let url = format!(
+        "{}/api/bot/sr?key={key}&user=Yan&q=https://www.youtube.com/watch?list=PL2&v={B}",
+        t.base
+    );
+    let r = t.http.get(url).send().await.unwrap().text().await.unwrap();
     assert!(r.contains(&format!("『Video {B}』")), "{r}");
 }

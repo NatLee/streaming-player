@@ -64,28 +64,6 @@ pub async fn run_trigger(
     Ok(Some(execute(state, cmd, &all, who, &clean(args)).await?))
 }
 
-/// Run by action, for callers that don't speak in triggers (the v1 Nightbot URLs).
-/// Uses the first command configured for the action, so its texts and limits apply.
-pub async fn run_action(
-    state: &AppState,
-    who: &Requester,
-    action: Action,
-    args: &str,
-) -> Result<Reply> {
-    let all = commands::list(&state.db).await?;
-    let cmd = all
-        .iter()
-        .find(|c| c.action == action)
-        .cloned()
-        .or_else(|| {
-            commands::defaults()
-                .into_iter()
-                .find(|c| c.action == action)
-        })
-        .expect("every action has a default command");
-    execute(state, &cmd, &all, who, &clean(args)).await
-}
-
 fn cooldown_left(state: &AppState, cmd: &Command, who: &Requester) -> Option<i64> {
     if cmd.cooldown_secs <= 0 {
         return None;

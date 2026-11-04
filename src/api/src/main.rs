@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use streaming_player::{app, auth, build_state, chat, legacy, media::ytdlp, Config};
+use streaming_player::{auth, build_state, chat, media::ytdlp, service, tokens, Config};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
@@ -7,7 +7,6 @@ const USAGE: &str = "Usage:
   streaming-player                                  start the server
   streaming-player reset-password <user> <password> reset a web user's password
   streaming-player update-ytdlp                     update yt-dlp to the latest stable release
-  streaming-player import-v1 <db.sqlite3>           copy songs and history from a v1 (Django) database
   streaming-player openapi                          print the OpenAPI document
 
 Settings come from SP_* environment variables, see README.";
@@ -29,18 +28,6 @@ async fn main() -> Result<()> {
                 bail!("{USAGE}");
             };
             reset_password(config, user, password).await
-        }
-        Some("import-v1") => {
-            let Some(path) = args.get(1) else {
-                bail!("{USAGE}");
-            };
-            let state = build_state(config).await?;
-            let r = legacy::import_v1(&state, path.as_ref()).await?;
-            println!(
-                "imported {} songs and {} requests from v1 ({} skipped)",
-                r.songs, r.requests, r.skipped
-            );
-            Ok(())
         }
         Some("update-ytdlp") => {
             println!("{}", ytdlp::update(&config.ytdlp).await?);
@@ -76,7 +63,7 @@ async fn serve(config: Config) -> Result<()> {
 
     let listener = TcpListener::bind(&bind).await?;
     tracing::info!("listening on http://{}", listener.local_addr()?);
-    axum::serve(listener, app(state))
+    axum::serve(listener, service(state))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     tracing::info!("stopped");
@@ -89,19 +76,17 @@ async fn reset_password(config: Config, user: &str, password: &str) -> Result<()
     }
     let state = build_state(config).await?;
     let hash = auth::hash_password(password.to_string()).await?;
-    let res = sqlx::query("UPDATE users SET password_hash = ? WHERE username = ?")
-        .bind(hash)
-        .bind(user)
-        .execute(&state.db)
-        .await?;
-    if res.rows_affected() == 0 {
+    let id: Option<i64> =
+        sqlx::query_scalar("UPDATE users SET password_hash = ? WHERE username = ? RETURNING id")
+            .bind(hash)
+            .bind(user)
+            .fetch_optional(&state.db)
+            .await?;
+    let Some(id) = id else {
         bail!("no such user: {user}");
-    }
-    sqlx::query("DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE username = ?)")
-        .bind(user)
-        .execute(&state.db)
-        .await?;
-    println!("password reset for {user}; all their sessions were signed out");
+    };
+    tokens::revoke_all_for_user(&state.db, id).await?;
+    println!("password reset for {user}; their sessions and tokens were signed out");
     Ok(())
 }
 

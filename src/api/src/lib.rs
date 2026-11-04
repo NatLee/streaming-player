@@ -12,15 +12,17 @@ pub mod db;
 pub mod error;
 pub mod events;
 pub mod google;
-pub mod legacy;
 pub mod live;
 pub mod media;
 pub mod models;
+pub mod perm;
 pub mod player;
 pub mod queue;
+pub mod roles;
 pub mod routes;
 pub mod settings;
 pub mod state;
+pub mod tokens;
 pub mod util;
 
 use std::sync::Arc;
@@ -47,9 +49,17 @@ pub async fn build_state(config: Config) -> Result<AppState> {
     let mut player = player::PlayerState::load(&db).await?;
     // A song left "playing" by the last run continues from the start.
     player.reset_for(queue::current(&db).await?.map(|e| e.id));
-    Ok(Arc::new(Inner::new(db, config, settings, player)?))
+    let jwt_key = tokens::signing_key(&db, config.jwt_secret.as_deref()).await?;
+    Ok(Arc::new(Inner::new(db, config, settings, player, jwt_key)?))
 }
 
 pub fn app(state: AppState) -> Router {
     routes::router(state)
+}
+
+/// The server with client addresses (used for the registration rate limit).
+pub fn service(
+    state: AppState,
+) -> axum::extract::connect_info::IntoMakeServiceWithConnectInfo<Router, std::net::SocketAddr> {
+    app(state).into_make_service_with_connect_info::<std::net::SocketAddr>()
 }

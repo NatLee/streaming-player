@@ -23,6 +23,7 @@ use crate::{
     live::{self, HubMsg, LiveState},
     media::stream::{self, PlaySource},
     models::{EndReason, Entry, Song},
+    perm::Perm,
     queue,
     settings::OBS_KEY,
     state::AppState,
@@ -51,7 +52,38 @@ pub struct WsQuery {
 }
 
 async fn can_view_public(state: &AppState, headers: &HeaderMap) -> anyhow::Result<bool> {
-    Ok(state.settings().viewer.public_queue || auth::session_user(state, headers).await?.is_some())
+    if state.settings().viewer.public_queue {
+        return Ok(true);
+    }
+    Ok(auth::authenticate(state, headers)
+        .await?
+        .is_some_and(|u| u.can(Perm::QueueView)))
+}
+
+/// What each page type needs to connect. Viewers need nothing while the public page is on.
+fn role_needs(role: Role, public_queue: bool) -> Option<Perm> {
+    match role {
+        Role::Player => Some(Perm::PlayerControl),
+        Role::Overlay | Role::Admin => Some(Perm::QueueView),
+        Role::Viewer if public_queue => None,
+        Role::Viewer => Some(Perm::QueueView),
+    }
+}
+
+/// Messages a page may send, and the permission each one needs.
+const MESSAGE_PERMS: &[(&str, Perm)] = &[
+    ("started", Perm::PlayerControl),
+    ("progress", Perm::PlayerControl),
+    ("ended", Perm::PlayerControl),
+    ("error", Perm::PlayerControl),
+    ("duration", Perm::PlayerControl),
+];
+
+fn message_allowed(kind: &str, grants: &[Perm]) -> bool {
+    MESSAGE_PERMS
+        .iter()
+        .find(|(k, _)| *k == kind)
+        .is_some_and(|(_, p)| grants.contains(p))
 }
 
 /// Live state stream. Messages: `hello`, `state`, `notice`, `leader`; players send
@@ -69,18 +101,25 @@ pub async fn ws(
         "admin" => Role::Admin,
         _ => Role::Viewer,
     };
-    let signed_in = auth::session_user(&state, &headers).await?.is_some();
-    let allowed = match role {
-        Role::Player | Role::Overlay => {
-            signed_in || auth::key_matches(&state, OBS_KEY, q.key.as_deref()).await?
-        }
-        Role::Admin => signed_in,
-        Role::Viewer => can_view_public(&state, &headers).await?,
+    // The OBS key stands for an OBS page: it may play and report. Otherwise the
+    // signed-in caller's permissions decide.
+    let grants: Vec<Perm> = if auth::key_matches(&state, OBS_KEY, q.key.as_deref()).await? {
+        vec![Perm::PlayerControl, Perm::QueueView]
+    } else {
+        auth::authenticate(&state, &headers)
+            .await?
+            .map(|u| u.permissions)
+            .unwrap_or_default()
     };
-    if !allowed {
-        return Err(AppError::Unauthorized("需要登入或 OBS 金鑰".into()));
+    if let Some(need) = role_needs(role, state.settings().viewer.public_queue) {
+        if !grants.contains(&need) {
+            return Err(AppError::Forbidden(format!(
+                "需要權限：{}（或 OBS 金鑰）",
+                need.info().label
+            )));
+        }
     }
-    Ok(upgrade.on_upgrade(move |socket| client(state, socket, role)))
+    Ok(upgrade.on_upgrade(move |socket| client(state, socket, role, grants)))
 }
 
 async fn send_state(state: &AppState) -> Option<String> {
@@ -90,7 +129,7 @@ async fn send_state(state: &AppState) -> Option<String> {
     Some(v.to_string())
 }
 
-async fn client(state: AppState, socket: WebSocket, role: Role) {
+async fn client(state: AppState, socket: WebSocket, role: Role, grants: Vec<Perm>) {
     let id = state.hub.connection_id();
     let mut events = state.hub.subscribe();
     let (mut tx, mut rx) = socket.split();
@@ -148,7 +187,7 @@ async fn client(state: AppState, socket: WebSocket, role: Role) {
             incoming = rx.next() => match incoming {
                 Some(Ok(Message::Text(text))) if is_player => {
                     if state.hub.leader() == Some(id) {
-                        if let Err(e) = handle_report(&state, text.as_str()).await {
+                        if let Err(e) = handle_report(&state, text.as_str(), &grants).await {
                             tracing::warn!("player report failed: {e:#}");
                         }
                     }
@@ -183,8 +222,11 @@ struct Report {
 }
 
 /// Reports from the leading player.
-async fn handle_report(state: &AppState, text: &str) -> anyhow::Result<()> {
+async fn handle_report(state: &AppState, text: &str, grants: &[Perm]) -> anyhow::Result<()> {
     let r: Report = serde_json::from_str(text)?;
+    if !message_allowed(&r.kind, grants) {
+        anyhow::bail!("not allowed to send {}", r.kind);
+    }
     match r.kind.as_str() {
         "started" | "progress" => {
             let synced = state

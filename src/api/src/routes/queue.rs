@@ -9,20 +9,24 @@ use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 
 use crate::{
-    auth::CurrentUser,
+    auth::Can,
     control,
     error::{AppError, AppResult},
     events,
     live::{self, LiveState},
     media::resolve::{self, ResolveError},
     models::{Level, Requester, Source},
+    perm::{need, Perm},
     queue::{self, Enqueued, Placement, Rejection},
     state::AppState,
     util::now,
 };
 
 #[utoipa::path(get, path = "/api/queue", tag = "queue", responses((status = 200, body = LiveState)))]
-pub async fn get(State(state): State<AppState>, _user: CurrentUser) -> AppResult<Json<LiveState>> {
+pub async fn get(
+    State(state): State<AppState>,
+    _c: Can<need::QueueView>,
+) -> AppResult<Json<LiveState>> {
     Ok(Json(live::snapshot(&state).await?))
 }
 
@@ -57,14 +61,20 @@ pub fn resolve_message(e: &ResolveError) -> AppError {
     AppError::bad(e.reason())
 }
 
-/// Add a song from the admin page. Queue limits don't apply; `placement=now` interrupts.
+/// Request a song from the web page. With `queue.manage` the queue limits don't apply,
+/// `placement` may be `next` or `now` (interrupt), and `requester` may name someone else.
+/// With only `queue.request` it is a normal request under the rules.
 #[utoipa::path(post, path = "/api/queue", tag = "queue", request_body = AddRequest,
     responses((status = 200, body = Enqueued), (status = 400, description = "Not found or refused")))]
 pub async fn add(
     State(state): State<AppState>,
-    user: CurrentUser,
+    Can(user, _): Can<need::QueueRequest>,
     Json(req): Json<AddRequest>,
 ) -> AppResult<Json<Enqueued>> {
+    let manager = user.can(Perm::QueueManage);
+    if !manager && (req.placement != Placement::End || req.requester.is_some()) {
+        user.require(Perm::QueueManage)?;
+    }
     let song = resolve::song_for(&state, &req.input)
         .await?
         .map_err(|e| resolve_message(&e))?;
@@ -73,8 +83,13 @@ pub async fn add(
         .map(|r| r.trim().to_string())
         .filter(|r| !r.is_empty())
         .unwrap_or_else(|| user.username.clone());
-    let who = Requester::new(&name, None, Level::Broadcaster, Source::Web);
-    match queue::enqueue(&state, &who, &song, req.placement, false).await? {
+    let level = if manager {
+        Level::Broadcaster
+    } else {
+        Level::Everyone
+    };
+    let who = Requester::new(&name, None, level, Source::Web);
+    match queue::enqueue(&state, &who, &song, req.placement, !manager).await? {
         Ok(done) => Ok(Json(done)),
         Err(r) => Err(AppError::Conflict(rejection_message(&r))),
     }
@@ -89,10 +104,13 @@ pub struct RemoveQuery {
 #[utoipa::path(delete, path = "/api/queue/{id}", tag = "queue", params(RemoveQuery), responses((status = 204), (status = 404)))]
 pub async fn remove(
     State(state): State<AppState>,
-    user: CurrentUser,
+    Can(user, _): Can<need::QueueManage>,
     Path(id): Path<i64>,
     Query(q): Query<RemoveQuery>,
 ) -> AppResult<StatusCode> {
+    if q.block.is_some() {
+        user.require(Perm::BlocklistManage)?;
+    }
     let e = queue::remove(&state, id)
         .await?
         .ok_or_else(|| AppError::not_found("這首歌已經不在佇列裡"))?;
@@ -148,7 +166,7 @@ pub struct MoveTo {
 #[utoipa::path(post, path = "/api/queue/{id}/move", tag = "queue", request_body = MoveTo, responses((status = 204), (status = 404)))]
 pub async fn move_to(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::QueueManage>,
     Path(id): Path<i64>,
     Json(m): Json<MoveTo>,
 ) -> AppResult<StatusCode> {
@@ -167,7 +185,7 @@ pub struct Order {
 #[utoipa::path(put, path = "/api/queue/order", tag = "queue", request_body = Order, responses((status = 204)))]
 pub async fn reorder(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::QueueManage>,
     Json(o): Json<Order>,
 ) -> AppResult<StatusCode> {
     queue::reorder(&state, &o.ids).await?;
@@ -178,7 +196,7 @@ pub async fn reorder(
 #[utoipa::path(post, path = "/api/queue/{id}/play-now", tag = "queue", responses((status = 204), (status = 404)))]
 pub async fn play_now(
     State(state): State<AppState>,
-    user: CurrentUser,
+    Can(user, _): Can<need::QueueManage>,
     Path(id): Path<i64>,
 ) -> AppResult<StatusCode> {
     if queue::play_now(&state, id).await? {
@@ -196,7 +214,10 @@ pub async fn play_now(
 }
 
 #[utoipa::path(post, path = "/api/queue/clear", tag = "queue", responses((status = 204)))]
-pub async fn clear(State(state): State<AppState>, user: CurrentUser) -> AppResult<StatusCode> {
+pub async fn clear(
+    State(state): State<AppState>,
+    Can(user, _): Can<need::QueueManage>,
+) -> AppResult<StatusCode> {
     let n = queue::clear(&state).await?;
     events::record(
         &state.db,
@@ -209,13 +230,19 @@ pub async fn clear(State(state): State<AppState>, user: CurrentUser) -> AppResul
 }
 
 #[utoipa::path(post, path = "/api/player/pause", tag = "player", responses((status = 204)))]
-pub async fn pause(State(state): State<AppState>, user: CurrentUser) -> AppResult<StatusCode> {
+pub async fn pause(
+    State(state): State<AppState>,
+    Can(user, _): Can<need::PlayerControl>,
+) -> AppResult<StatusCode> {
     control::set_paused(&state, true, &user.username).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(post, path = "/api/player/resume", tag = "player", responses((status = 204)))]
-pub async fn resume(State(state): State<AppState>, user: CurrentUser) -> AppResult<StatusCode> {
+pub async fn resume(
+    State(state): State<AppState>,
+    Can(user, _): Can<need::PlayerControl>,
+) -> AppResult<StatusCode> {
     control::set_paused(&state, false, &user.username).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -230,10 +257,13 @@ pub struct SkipBody {
 #[utoipa::path(post, path = "/api/player/skip", tag = "player", request_body = SkipBody, responses((status = 204), (status = 404)))]
 pub async fn skip(
     State(state): State<AppState>,
-    user: CurrentUser,
+    Can(user, _): Can<need::PlayerControl>,
     body: Option<Json<SkipBody>>,
 ) -> AppResult<StatusCode> {
     let block = body.map(|b| b.block).unwrap_or(false);
+    if block {
+        user.require(Perm::BlocklistManage)?;
+    }
     match control::skip(&state, block, &user.username).await? {
         Some(_) => Ok(StatusCode::NO_CONTENT),
         None => Err(AppError::not_found("現在沒有在播的歌")),
@@ -250,7 +280,7 @@ pub struct VolumeBody {
 #[utoipa::path(put, path = "/api/player/volume", tag = "player", request_body = VolumeBody, responses((status = 204)))]
 pub async fn volume(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::PlayerControl>,
     Json(v): Json<VolumeBody>,
 ) -> AppResult<StatusCode> {
     control::set_volume(&state, v.volume, v.muted).await?;

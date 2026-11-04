@@ -7,10 +7,11 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 use crate::{
-    auth::{AdminUser, CurrentUser},
+    auth::Can,
     commands::{self, Action, Command, ALL_ACTIONS},
     error::{AppError, AppResult},
     events,
+    perm::need,
     state::AppState,
 };
 
@@ -38,7 +39,7 @@ pub struct CommandList {
 #[utoipa::path(get, path = "/api/commands", tag = "commands", responses((status = 200, body = CommandList)))]
 pub async fn list(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::SettingsView>,
 ) -> AppResult<Json<CommandList>> {
     let actions = ALL_ACTIONS
         .iter()
@@ -72,7 +73,7 @@ async fn checked(state: &AppState, mut cmd: Command) -> AppResult<Command> {
 #[utoipa::path(post, path = "/api/commands", tag = "commands", request_body = Command, responses((status = 200, body = Command)))]
 pub async fn create(
     State(state): State<AppState>,
-    AdminUser(admin): AdminUser,
+    Can(admin, _): Can<need::CommandsManage>,
     Json(cmd): Json<Command>,
 ) -> AppResult<Json<Command>> {
     let mut cmd = checked(&state, Command { id: 0, ..cmd }).await?;
@@ -90,7 +91,7 @@ pub async fn create(
 #[utoipa::path(put, path = "/api/commands/{id}", tag = "commands", request_body = Command, responses((status = 200, body = Command)))]
 pub async fn update(
     State(state): State<AppState>,
-    AdminUser(admin): AdminUser,
+    Can(admin, _): Can<need::CommandsManage>,
     Path(id): Path<i64>,
     Json(cmd): Json<Command>,
 ) -> AppResult<Json<Command>> {
@@ -111,7 +112,7 @@ pub async fn update(
 #[utoipa::path(delete, path = "/api/commands/{id}", tag = "commands", responses((status = 204)))]
 pub async fn remove(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    _c: Can<need::CommandsManage>,
     Path(id): Path<i64>,
 ) -> AppResult<StatusCode> {
     if commands::get(&state.db, id).await?.is_none() || !commands::delete(&state.db, id).await? {
@@ -124,7 +125,7 @@ pub async fn remove(
 #[utoipa::path(post, path = "/api/commands/reset", tag = "commands", responses((status = 204)))]
 pub async fn reset(
     State(state): State<AppState>,
-    AdminUser(admin): AdminUser,
+    Can(admin, _): Can<need::CommandsManage>,
 ) -> AppResult<StatusCode> {
     sqlx::query("DELETE FROM commands")
         .execute(&state.db)

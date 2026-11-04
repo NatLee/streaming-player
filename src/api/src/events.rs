@@ -10,6 +10,10 @@ use crate::util::now;
 /// Keep this many rows; older ones are pruned.
 const KEEP_EVENTS: i64 = 5000;
 
+/// Kinds that make up the audit log (accounts, roles, API tokens). Only people who manage
+/// users read them (`/api/users/audit`); the dashboard's activity log leaves them out.
+pub const AUDIT_KINDS: &[&str] = &["user", "role", "token"];
+
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct Event {
     pub id: i64,
@@ -44,11 +48,24 @@ pub async fn record(db: &SqlitePool, actor: &str, kind: &str, detail: &str) {
     }
 }
 
+/// The newest activity, without the audit log.
 pub async fn recent(db: &SqlitePool, limit: i64) -> anyhow::Result<Vec<Event>> {
-    Ok(
-        sqlx::query_as("SELECT id, at, actor, kind, detail FROM events ORDER BY id DESC LIMIT ?")
-            .bind(limit.clamp(1, 500))
-            .fetch_all(db)
-            .await?,
-    )
+    select(db, "NOT IN", limit).await
+}
+
+/// The newest audit log entries.
+pub async fn audit(db: &SqlitePool, limit: i64) -> anyhow::Result<Vec<Event>> {
+    select(db, "IN", limit).await
+}
+
+async fn select(db: &SqlitePool, membership: &str, limit: i64) -> anyhow::Result<Vec<Event>> {
+    let sql = format!(
+        "SELECT id, at, actor, kind, detail FROM events \
+         WHERE kind {membership} (SELECT value FROM json_each(?)) ORDER BY id DESC LIMIT ?"
+    );
+    Ok(sqlx::query_as(&sql)
+        .bind(serde_json::to_string(AUDIT_KINDS)?)
+        .bind(limit.clamp(1, 500))
+        .fetch_all(db)
+        .await?)
 }

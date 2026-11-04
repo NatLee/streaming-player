@@ -11,12 +11,13 @@ use utoipa::{IntoParams, ToSchema};
 
 use super::queue::{block_user, rejection_message, resolve_message};
 use crate::{
-    auth::CurrentUser,
+    auth::{Can, CurrentUser},
     error::{AppError, AppResult},
     events::{self, Event},
     live,
     media::resolve,
     models::{Entry, Level, Requester, Song, Source, ENTRY_COLUMNS},
+    perm::{need, Perm},
     queue::{self, Enqueued, Placement, UserStats},
     state::AppState,
 };
@@ -56,7 +57,7 @@ const LIBRARY_FILTERS: &[(&str, &str)] = &[
 #[utoipa::path(get, path = "/api/library", tag = "library", params(LibraryQuery), responses((status = 200, body = Page<LibrarySong>)))]
 pub async fn list(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::LibraryManage>,
     Query(q): Query<LibraryQuery>,
 ) -> AppResult<Json<Page<LibrarySong>>> {
     let filter = q
@@ -97,7 +98,7 @@ pub struct AddSong {
 #[utoipa::path(post, path = "/api/library", tag = "library", request_body = AddSong, responses((status = 200, body = Song)))]
 pub async fn add(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::LibraryManage>,
     Json(a): Json<AddSong>,
 ) -> AppResult<Json<Song>> {
     let song = resolve::song_for(&state, &a.input)
@@ -129,6 +130,8 @@ pub struct SongPatch {
     pub title: Option<String>,
 }
 
+/// Each field needs its own permission: `blocked` needs `blocklist.manage`, the rest
+/// `library.manage`.
 #[utoipa::path(patch, path = "/api/library/{id}", tag = "library", request_body = SongPatch, responses((status = 200, body = Song)))]
 pub async fn update(
     State(state): State<AppState>,
@@ -136,15 +139,23 @@ pub async fn update(
     Path(id): Path<i64>,
     Json(p): Json<SongPatch>,
 ) -> AppResult<Json<Song>> {
-    let song = load_song(&state, id).await?;
+    // column, new value, permission it needs (a fixed list: no user input reaches the SQL)
     let flags = [
-        ("favorite", p.favorite),
-        ("blocked", p.blocked),
-        ("missing", p.missing),
+        ("favorite", p.favorite, Perm::LibraryManage),
+        ("blocked", p.blocked, Perm::BlocklistManage),
+        ("missing", p.missing, Perm::LibraryManage),
     ];
-    for (column, value) in flags {
+    if flags.iter().all(|(_, v, _)| v.is_none()) || p.title.is_some() {
+        user.require(Perm::LibraryManage)?;
+    }
+    for (_, v, need) in &flags {
+        if v.is_some() {
+            user.require(*need)?;
+        }
+    }
+    let song = load_song(&state, id).await?;
+    for (column, value, _) in flags {
         if let Some(v) = value {
-            // column names come from the fixed list above
             sqlx::query(&format!("UPDATE songs SET {column} = ? WHERE id = ?"))
                 .bind(v)
                 .bind(id)
@@ -183,7 +194,7 @@ pub async fn update(
 #[utoipa::path(delete, path = "/api/library/{id}", tag = "library", responses((status = 204), (status = 409)))]
 pub async fn remove(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::LibraryManage>,
     Path(id): Path<i64>,
 ) -> AppResult<StatusCode> {
     let active: i64 = sqlx::query_scalar(
@@ -211,7 +222,7 @@ pub struct EnqueueSong {
 #[utoipa::path(post, path = "/api/library/{id}/enqueue", tag = "library", request_body = EnqueueSong, responses((status = 200, body = Enqueued)))]
 pub async fn enqueue(
     State(state): State<AppState>,
-    user: CurrentUser,
+    Can(user, _): Can<need::QueueManage>,
     Path(id): Path<i64>,
     Json(e): Json<EnqueueSong>,
 ) -> AppResult<Json<Enqueued>> {
@@ -253,7 +264,7 @@ fn csv_field(s: &str) -> String {
 #[utoipa::path(get, path = "/api/library/export", tag = "library", params(ExportQuery), responses((status = 200, body = [SongRecord])))]
 pub async fn export(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::LibraryManage>,
     Query(q): Query<ExportQuery>,
 ) -> AppResult<impl IntoResponse> {
     let songs: Vec<Song> = sqlx::query_as("SELECT * FROM songs ORDER BY id")
@@ -311,7 +322,7 @@ pub struct ImportResult {
 #[utoipa::path(post, path = "/api/library/import", tag = "library", request_body = [SongRecord], responses((status = 200, body = ImportResult)))]
 pub async fn import(
     State(state): State<AppState>,
-    user: CurrentUser,
+    Can(user, _): Can<need::LibraryManage>,
     Json(records): Json<Vec<SongRecord>>,
 ) -> AppResult<Json<ImportResult>> {
     let (mut imported, mut skipped) = (0, 0);
@@ -352,7 +363,7 @@ pub struct HistoryQuery {
 #[utoipa::path(get, path = "/api/history", tag = "history", params(HistoryQuery), responses((status = 200, body = Page<Entry>)))]
 pub async fn history(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::HistoryView>,
     Query(q): Query<HistoryQuery>,
 ) -> AppResult<Json<Page<Entry>>> {
     Ok(Json(
@@ -402,7 +413,7 @@ pub struct StatsQuery {
 #[utoipa::path(get, path = "/api/history/stats", tag = "history", params(StatsQuery), responses((status = 200, body = UserStats), (status = 404)))]
 pub async fn stats(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::HistoryView>,
     Query(q): Query<StatsQuery>,
 ) -> AppResult<Json<UserStats>> {
     queue::user_stats(&state.db, &q.user)
@@ -424,10 +435,23 @@ pub struct BlockedUser {
 #[utoipa::path(get, path = "/api/blocklist", tag = "blocklist", responses((status = 200, body = [BlockedUser])))]
 pub async fn blocklist(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::BlocklistManage>,
 ) -> AppResult<Json<Vec<BlockedUser>>> {
     Ok(Json(
         sqlx::query_as("SELECT * FROM blocked_users ORDER BY id DESC")
+            .fetch_all(&state.db)
+            .await?,
+    ))
+}
+
+/// Songs on the block list.
+#[utoipa::path(get, path = "/api/blocklist/songs", tag = "blocklist", responses((status = 200, body = [Song])))]
+pub async fn blocked_songs(
+    State(state): State<AppState>,
+    _c: Can<need::BlocklistManage>,
+) -> AppResult<Json<Vec<Song>>> {
+    Ok(Json(
+        sqlx::query_as("SELECT * FROM songs WHERE blocked = 1 ORDER BY title")
             .fetch_all(&state.db)
             .await?,
     ))
@@ -444,7 +468,7 @@ pub struct NewBlock {
 #[utoipa::path(post, path = "/api/blocklist", tag = "blocklist", request_body = NewBlock, responses((status = 204)))]
 pub async fn block(
     State(state): State<AppState>,
-    user: CurrentUser,
+    Can(user, _): Can<need::BlocklistManage>,
     Json(b): Json<NewBlock>,
 ) -> AppResult<StatusCode> {
     let name = b.name.trim();
@@ -470,7 +494,7 @@ pub async fn block(
 #[utoipa::path(delete, path = "/api/blocklist/{id}", tag = "blocklist", responses((status = 204)))]
 pub async fn unblock(
     State(state): State<AppState>,
-    user: CurrentUser,
+    Can(user, _): Can<need::BlocklistManage>,
     Path(id): Path<i64>,
 ) -> AppResult<StatusCode> {
     let name: Option<String> =
@@ -497,7 +521,7 @@ pub struct EventsQuery {
 #[utoipa::path(get, path = "/api/events", tag = "history", params(EventsQuery), responses((status = 200, body = [Event])))]
 pub async fn recent_events(
     State(state): State<AppState>,
-    _user: CurrentUser,
+    _c: Can<need::HistoryView>,
     Query(q): Query<EventsQuery>,
 ) -> AppResult<Json<Vec<Event>>> {
     Ok(Json(

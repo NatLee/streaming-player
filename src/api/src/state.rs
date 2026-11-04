@@ -26,6 +26,10 @@ pub struct Inner {
     pub login_failures: Mutex<HashMap<String, Vec<i64>>>,
     /// Google sign-ins waiting for the redirect back (state → verifier, nonce).
     pub oauth_pending: Mutex<HashMap<String, crate::google::PendingLogin>>,
+    /// Client address → recent registration attempts (anti-flood).
+    pub register_attempts: Mutex<Vec<(String, i64)>>,
+    /// HS256 key for access tokens (`tokens.rs`).
+    pub jwt_key: Vec<u8>,
     /// (command id, user key) → last time the user ran the command.
     pub cooldowns: Mutex<HashMap<(i64, String), i64>>,
     pub streams: StreamCache,
@@ -38,6 +42,7 @@ impl Inner {
         config: Config,
         settings: Settings,
         player: PlayerState,
+        jwt_key: Vec<u8>,
     ) -> anyhow::Result<Self> {
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(20))
@@ -53,6 +58,8 @@ impl Inner {
             settings: RwLock::new(settings),
             login_failures: Mutex::new(HashMap::new()),
             oauth_pending: Mutex::new(HashMap::new()),
+            register_attempts: Mutex::new(Vec::new()),
+            jwt_key,
             cooldowns: Mutex::new(HashMap::new()),
             streams: StreamCache::default(),
             chat: chat::Manager::default(),

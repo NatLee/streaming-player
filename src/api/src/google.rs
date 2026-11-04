@@ -1,7 +1,8 @@
 //! Google sign-in (OAuth 2.0 authorization code flow with PKCE, state and nonce).
 //!
-//! v1 let any gmail.com account in. Now only a user whose email an admin entered on the
-//! Users page can sign in; the first sign-in remembers the Google account (`sub`).
+//! v1 let any gmail.com account in. Now Google follows the registration setting: when it
+//! is open, a new Google account gets an account with the default role; when closed, only
+//! an email an admin entered can sign in. The first sign-in remembers the account (`sub`).
 //!
 //! The ID token comes straight from Google's token endpoint over TLS with our client
 //! secret, so per OpenID Connect Core 3.1.3.7 TLS authenticates the issuer; we still
@@ -20,7 +21,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    auth,
+    auth::{self, ClientIp},
     config::GoogleConfig,
     state::AppState,
     util::{now, random_hex},
@@ -122,6 +123,7 @@ pub struct CallbackQuery {
     responses((status = 303, description = "Signed in; redirect to the admin page")))]
 pub async fn callback(
     State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
     headers: HeaderMap,
     Query(q): Query<CallbackQuery>,
 ) -> Response {
@@ -164,9 +166,10 @@ pub async fn callback(
     ) else {
         return fail("google_failed", secure);
     };
-    match find_user(&state, sub, email).await {
-        Ok(Some((_, true))) => fail("user_disabled", secure),
-        Ok(Some((user_id, false))) => {
+    match google_account(&state, sub, email, &ip).await {
+        Ok(GoogleAccount::Disabled) => fail("user_disabled", secure),
+        Ok(GoogleAccount::TooMany) => fail("register_limited", secure),
+        Ok(GoogleAccount::Found(user_id)) => {
             let token = async {
                 auth::touch_login(&state.db, user_id).await?;
                 auth::create_session(&state.db, user_id).await
@@ -187,7 +190,7 @@ pub async fn callback(
                 }
             }
         }
-        Ok(None) => {
+        Ok(GoogleAccount::NotAllowed) => {
             tracing::info!("Google account {email} has no matching user");
             fail("google_not_allowed", secure)
         }
@@ -264,6 +267,85 @@ pub fn check_claims(claims: &Value, client_id: &str, nonce: &str, now: i64) -> a
         anyhow::bail!("nonce mismatch");
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GoogleAccount {
+    Found(i64),
+    Disabled,
+    /// No such user, and registration is closed.
+    NotAllowed,
+    /// Registration is open but this address made too many accounts lately.
+    TooMany,
+}
+
+/// The account for a Google sign-in. Same rules as `/api/auth/register`: with
+/// registration open, an unknown Google account gets a new account with the default
+/// role; with it closed, only an email an admin entered may sign in.
+pub async fn google_account(
+    state: &AppState,
+    sub: &str,
+    email: &str,
+    ip: &str,
+) -> anyhow::Result<GoogleAccount> {
+    if let Some((id, disabled)) = find_user(state, sub, email).await? {
+        return Ok(if disabled {
+            GoogleAccount::Disabled
+        } else {
+            GoogleAccount::Found(id)
+        });
+    }
+    let rules = state.settings().auth;
+    if !rules.registration_open {
+        return Ok(GoogleAccount::NotAllowed);
+    }
+    if auth::check_register_limit(state, ip).is_err() {
+        return Ok(GoogleAccount::TooMany);
+    }
+    let username = free_username(state, email).await?;
+    let id = auth::create_account(
+        &state.db,
+        auth::NewAccount {
+            username: &username,
+            password_hash: String::new(),
+            role: &rules.default_role,
+            email: Some(email.trim().to_lowercase()),
+            google_sub: Some(sub),
+        },
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+    crate::events::record(&state.db, &username, "user", "用 Google 登入註冊了帳號").await;
+    Ok(GoogleAccount::Found(id))
+}
+
+/// A username from the email's local part (`nat.lee@…` → `nat.lee`), with `-2`, `-3`…
+/// added when it is taken.
+async fn free_username(state: &AppState, email: &str) -> anyhow::Result<String> {
+    let local = email.split('@').next().unwrap_or("");
+    let mut base: String = local
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+        .take(24)
+        .collect();
+    if base.chars().count() < 2 {
+        base = "user".into();
+    }
+    for n in 1..1000 {
+        let name = if n == 1 {
+            base.clone()
+        } else {
+            format!("{base}-{n}")
+        };
+        let taken: Option<i64> = sqlx::query_scalar("SELECT 1 FROM users WHERE username = ?")
+            .bind(&name)
+            .fetch_optional(&state.db)
+            .await?;
+        if taken.is_none() {
+            return Ok(name);
+        }
+    }
+    anyhow::bail!("no free username for {email}")
 }
 
 /// By Google `sub` first; otherwise by email for a user not yet linked (and link it).
