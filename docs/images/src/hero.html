@@ -1,0 +1,150 @@
+<!doctype html>
+<!--
+  README banner. Render the light and dark versions (#dark picks the dark theme) with a
+  Chromium-based browser, e.g.
+    msedge --headless=new --hide-scrollbars --force-device-scale-factor=2 --window-size=960,400
+           --default-background-color=00000000 --virtual-time-budget=5000
+           --screenshot=hero-dark.png "file:///…/hero.html#dark"
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Streaming Player banner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=block" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff; --bg2: #f6f8fa; --ink: #1f2328; --muted: #59636e; --line: #d1d9e0; --card: #ffffff;
+    --gold: #b8862a; --twitch: #8250df; --yt: #cf222e; --bot: #0969da; --green: #1a7f37;
+    --shadow: 0 1px 2px rgba(31,35,40,.06), 0 6px 18px rgba(31,35,40,.06);
+    --tint1: rgba(217,166,58,.16); --tint2: rgba(130,80,223,.08); --wire: #afb8c1;
+  }
+  .dark {
+    --bg: #0d1117; --bg2: #151b23; --ink: #f0f6fc; --muted: #9198a1; --line: #3d444d; --card: #151b23;
+    --gold: #f0c35a; --twitch: #a371f7; --yt: #f85149; --bot: #4493f8; --green: #3fb950;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --tint1: rgba(240,195,90,.14); --tint2: rgba(163,113,247,.10); --wire: #656c76;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; }
+  body { width: 960px; height: 400px; font-family: Inter, "Segoe UI", sans-serif; color: var(--ink); }
+  .frame { position: relative; width: 960px; height: 400px; border-radius: 22px; overflow: hidden;
+           border: 1px solid var(--line);
+           background: radial-gradient(520px 300px at 92% 8%, var(--tint1), transparent 70%),
+                       radial-gradient(420px 260px at 4% 100%, var(--tint2), transparent 70%), var(--bg); }
+  .dots { position: absolute; inset: 0; opacity: .55;
+          background-image: radial-gradient(var(--line) 1px, transparent 1.2px); background-size: 22px 22px;
+          -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 55%, #000 100%); }
+
+  header { position: absolute; left: 44px; top: 34px; display: flex; align-items: center; gap: 18px; }
+  .mark { width: 58px; height: 58px; border-radius: 16px; background: #14141c;
+          display: grid; place-items: center; box-shadow: var(--shadow); }
+  h1 { margin: 0; font-size: 44px; font-weight: 800; letter-spacing: -0.035em; line-height: 1; }
+  .tag { margin: 8px 0 0; font-size: 17.5px; color: var(--muted); letter-spacing: -0.005em; }
+  .tag b { color: var(--ink); font-weight: 600; }
+
+  .node { position: absolute; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+          box-shadow: var(--shadow); padding: 11px 14px; }
+  .label { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+           display: flex; align-items: center; gap: 8px; }
+  .label i { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); }
+  .mono { font-family: "JetBrains Mono", Consolas, monospace; font-size: 13px; margin-top: 6px; white-space: nowrap; }
+  .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .sub code { font-family: "JetBrains Mono", Consolas, monospace; font-size: 11.5px; color: var(--ink); }
+
+  .src { left: 44px; width: 250px; }
+  #twitch { top: 126px; } #twitch .label i { background: var(--twitch); }
+  #yt { top: 210px; } #yt .label i { background: var(--yt); }
+  #bot { top: 294px; } #bot .label i { background: var(--bot); }
+
+  #queue { left: 356px; top: 176px; width: 250px; padding: 14px 16px; }
+  #queue .title { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; margin-top: 8px; }
+  #queue .rows { margin-top: 10px; display: grid; gap: 5px; }
+  #queue .row { display: flex; gap: 8px; align-items: center; font-size: 12.5px; }
+  #queue .row b { font-family: "JetBrains Mono", Consolas, monospace; font-size: 11.5px; color: var(--gold); width: 22px; }
+  #queue .row span { color: var(--muted); margin-left: auto; font-size: 11.5px; }
+
+  .out { left: 676px; width: 240px; }
+  #player { top: 160px; } #player .label i { background: var(--green); }
+  #overlay { top: 254px; } #overlay .label i { background: var(--green); }
+
+  .pip { position: absolute; right: 44px; top: 42px; font-family: "JetBrains Mono", Consolas, monospace; font-size: 14px;
+         padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); box-shadow: var(--shadow); }
+  .pip span { color: var(--muted); margin-right: 8px; user-select: none; }
+  svg.wires { position: absolute; inset: 0; }
+  .wire { fill: none; stroke: var(--wire); stroke-width: 2; stroke-dasharray: 5 6; }
+  .head { fill: var(--wire); }
+</style>
+</head>
+<body>
+<script>if (location.hash === '#dark') document.documentElement.className = 'dark';</script>
+<div class="frame">
+  <div class="dots"></div>
+
+  <header>
+    <div class="mark">
+      <svg width="34" height="34" viewBox="0 0 64 64">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0c35a"/><stop offset="1" stop-color="#e0703c"/></linearGradient></defs>
+        <path d="M22 12v40l30-20z" fill="url(#g)"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Streaming Player</h1>
+      <p class="tag">Song requests for live streams: <b>chat asks</b>, a queue decides, <b>OBS plays</b>.</p>
+    </div>
+  </header>
+
+  <div class="pip"><span>$</span>docker compose up -d</div>
+
+  <svg class="wires" width="960" height="400">
+    <path class="wire" d="M296 164 C 326 164, 322 222, 348 222"/>
+    <path class="wire" d="M296 248 C 320 248, 324 248, 348 248"/>
+    <path class="wire" d="M296 332 C 326 332, 322 274, 348 274"/>
+    <path class="head" d="M354 222 l-9 -5 v10 z"/>
+    <path class="head" d="M354 248 l-9 -5 v10 z"/>
+    <path class="head" d="M354 274 l-9 -5 v10 z"/>
+    <path class="wire" d="M608 236 C 640 236, 636 194, 668 194"/>
+    <path class="wire" d="M608 262 C 640 262, 636 288, 668 288"/>
+    <path class="head" d="M674 194 l-9 -5 v10 z"/>
+    <path class="head" d="M674 288 l-9 -5 v10 z"/>
+  </svg>
+
+  <div class="node src" id="twitch">
+    <div class="label"><i></i>Twitch chat</div>
+    <div class="mono">!sr youtu.be/…</div>
+    <div class="sub">EventSub, replies in chat</div>
+  </div>
+  <div class="node src" id="yt">
+    <div class="label"><i></i>YouTube live chat</div>
+    <div class="mono">!點歌 小幸運</div>
+    <div class="sub">Live Chat API, an API key</div>
+  </div>
+  <div class="node src" id="bot">
+    <div class="label"><i></i>Any chat bot</div>
+    <div class="mono">/api/bot/sr?key=…</div>
+    <div class="sub">Nightbot, StreamElements, Fossabot…</div>
+  </div>
+
+  <div class="node" id="queue">
+    <div class="label"><i></i>Queue</div>
+    <div class="title">Rules, votes, order</div>
+    <div class="rows">
+      <div class="row"><b>#1</b>on air<span>YouTube embed</span></div>
+      <div class="row"><b>#2</b>next<span>yt-dlp link</span></div>
+      <div class="row"><b>★</b>empty queue<span>default playlist</span></div>
+    </div>
+  </div>
+
+  <div class="node out" id="player">
+    <div class="label"><i></i>OBS player</div>
+    <div class="mono">/obs/player</div>
+    <div class="sub">video + sound, every device in sync</div>
+  </div>
+  <div class="node out" id="overlay">
+    <div class="label"><i></i>Now-playing overlay</div>
+    <div class="mono">/obs/overlay</div>
+    <div class="sub">transparent card, request pop-ups</div>
+  </div>
+</div>
+</body>
+</html>

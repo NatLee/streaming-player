@@ -1,0 +1,10 @@
+.git
+.github
+docs
+data
+**/node_modules
+**/dist
+**/target
+*.db
+*.db-*
+.env
