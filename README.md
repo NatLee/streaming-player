@@ -227,17 +227,6 @@ curl -s -X POST -H "Authorization: Bearer eyJ…" http://localhost:7878/api/play
 
 v2 is not compatible with v1: the old `/player/nightbot/…` URLs and the Django database are gone. Replace each Nightbot command with the text the admin page gives you (**聊天室連線**), and rebuild the library or import it as CSV. Steps: [moving from v1](docs/migration-v1.md).
 
-## Family tree
-
-```mermaid
-flowchart LR
-  A["youtube-video-redirector<br/>Flask · ?v=&lt;id&gt; plays one video<br/>from its direct link"] --> B["youtube-redirect-player<br/>Flask + Socket.IO · Default / Request /<br/>History playlists, synced players"]
-  B --> C["streaming-player v1<br/>Django + Channels + nginx · Nightbot<br/>requests, admin, votes"]
-  C -. "not compatible" .-> D["streaming-player v2<br/>Rust + React · Twitch, YouTube and any bot,<br/>OBS player and overlay, roles"]
-```
-
-From [youtube-video-redirector](https://github.com/NatLee/youtube-video-redirector) v2 keeps "play this one video now": `/watch?v=<id>` plays a YouTube video without touching the queue. From [youtube-redirect-player](https://github.com/NatLee/youtube-redirect-player) it keeps the default, request and history lists (default playlist, queue, history) and players synced across devices; history is no longer capped at 200, because the statistics need all of it.
-
 ## Development
 
 The server builds and tests in Docker; no local Rust needed.
