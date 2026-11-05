@@ -27,8 +27,8 @@ export function youtubeId(input: string): string | null {
 }
 
 /**
- * `/watch?v=<id>` — play one YouTube video right away, without the queue
- * (what youtube-video-redirector did). Signed-in users can also add it to the queue.
+ * `/watch?v=<id>` — play one YouTube video right away, without the queue.
+ * Signed-in users can also add it to the queue.
  */
 export function Watch() {
   const [params, setParams] = useSearchParams();
