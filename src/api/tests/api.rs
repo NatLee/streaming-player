@@ -520,6 +520,109 @@ async fn players_sync_over_websocket_with_one_leader() {
 }
 
 #[tokio::test]
+async fn seeking_moves_every_player_and_drops_older_reports() {
+    let mut t = start().await;
+    let mut lead = t.ws("player").await;
+    lead.expect("hello", |_| true).await;
+    let mut follow = t.ws("player").await;
+    follow.expect("hello", |_| true).await;
+
+    // Nothing on air, then a song that no player has started yet.
+    let (s, _) = t
+        .call(
+            Method::POST,
+            "/api/player/seek",
+            Some(json!({"offset_ms": 5000})),
+        )
+        .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    t.bot("sr", "Alice", &yt(A)).await;
+    let st = follow.expect("state", |v| v["now"].is_object()).await;
+    let id = st["now"]["id"].as_i64().unwrap();
+    assert_eq!(st["now"]["seek_seq"], 0);
+    let (s, _) = t
+        .call(
+            Method::POST,
+            "/api/player/seek",
+            Some(json!({"position_ms": 60000})),
+        )
+        .await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "no position to move before the song starts"
+    );
+
+    // Exactly one of the two fields.
+    for body in [json!({}), json!({"position_ms": 1000, "offset_ms": 1000})] {
+        let (s, _) = t.call(Method::POST, "/api/player/seek", Some(body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+    }
+
+    // Pause so the clock stands still and the positions below are exact.
+    lead.send(json!({"type": "started", "request_id": id, "position_ms": 40000, "seek_seq": 0}))
+        .await;
+    t.call(Method::POST, "/api/player/pause", None).await;
+    let st = follow
+        .expect("state", |v| {
+            v["player"]["paused"] == true && v["now"]["clock_started"] == true
+        })
+        .await;
+    // About 40 s: whatever ran between the start report and the pause comes on top.
+    let before = st["now"]["elapsed_ms"].as_i64().unwrap();
+    assert!((40000..41000).contains(&before), "{before}");
+
+    // Forward 5 s: every player page sees the new position and the new seek number.
+    let (s, _) = t
+        .call(
+            Method::POST,
+            "/api/player/seek",
+            Some(json!({"offset_ms": 5000})),
+        )
+        .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let st = follow.expect("state", |v| v["now"]["seek_seq"] == 1).await;
+    assert_eq!(st["now"]["elapsed_ms"], before + 5000);
+    let st = lead.expect("state", |v| v["now"]["seek_seq"] == 1).await;
+    assert_eq!(
+        st["now"]["elapsed_ms"],
+        before + 5000,
+        "the leader is told to jump too"
+    );
+
+    // A progress report the leader sent before it jumped does not pull the clock back;
+    // the next one, sent after the jump, counts again.
+    lead.send(json!({"type": "progress", "request_id": id, "position_ms": 41000, "seek_seq": 0}))
+        .await;
+    lead.send(json!({"type": "progress", "request_id": id, "position_ms": 45500, "seek_seq": 1}))
+        .await;
+    let st = follow
+        .expect("state", |v| v["now"]["elapsed_ms"] != before + 5000)
+        .await;
+    assert_eq!(st["now"]["elapsed_ms"], 45500);
+
+    // Back past the start stops at 0; a position past the end stops at the end.
+    t.call(
+        Method::POST,
+        "/api/player/seek",
+        Some(json!({"offset_ms": -600000})),
+    )
+    .await;
+    assert_eq!(t.queue().await["now"]["elapsed_ms"], 0);
+    let end = st["now"]["song"]["duration_secs"].as_i64().unwrap() * 1000;
+    t.call(
+        Method::POST,
+        "/api/player/seek",
+        Some(json!({"position_ms": end + 99000})),
+    )
+    .await;
+    let q = t.queue().await;
+    assert_eq!(q["now"]["elapsed_ms"], end);
+    assert_eq!(q["now"]["seek_seq"], 3);
+    assert_eq!(q["player"]["paused"], true, "seeking does not resume");
+}
+
+#[tokio::test]
 async fn failures_mark_a_song_missing_and_autoplay_uses_favorites() {
     let mut t = start().await;
     let mut player = t.ws("player").await;

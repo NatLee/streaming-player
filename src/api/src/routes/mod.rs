@@ -107,6 +107,7 @@ pub fn openapi_router() -> OpenApiRouter<AppState> {
         .routes(routes!(queue::pause))
         .routes(routes!(queue::resume))
         .routes(routes!(queue::skip))
+        .routes(routes!(queue::seek))
         .routes(routes!(queue::volume))
         .routes(routes!(library::list, library::add))
         .routes(routes!(library::update, library::remove))

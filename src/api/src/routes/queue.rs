@@ -10,13 +10,14 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     auth::Can,
-    control,
+    control::{self, Seeked},
     error::{AppError, AppResult},
     events,
     live::{self, LiveState},
     media::resolve::{self, ResolveError},
     models::{Level, Requester, Source},
     perm::{need, Perm},
+    player::Seek,
     queue::{self, Enqueued, Placement, Rejection},
     state::AppState,
     util::now,
@@ -267,6 +268,38 @@ pub async fn skip(
     match control::skip(&state, block, &user.username).await? {
         Some(_) => Ok(StatusCode::NO_CONTENT),
         None => Err(AppError::not_found("現在沒有在播的歌")),
+    }
+}
+
+/// Give exactly one of the two.
+#[derive(Deserialize, ToSchema)]
+pub struct SeekBody {
+    /// Jump to this position, in milliseconds from the start.
+    pub position_ms: Option<i64>,
+    /// Or move by this much from where the song is now; negative goes back.
+    pub offset_ms: Option<i64>,
+}
+
+/// Move the song on air. Positions past the end are kept at the end (the song then ends).
+#[utoipa::path(post, path = "/api/player/seek", tag = "player", request_body = SeekBody,
+    responses((status = 204), (status = 400, description = "Neither or both fields"), (status = 404, description = "Nothing on air"),
+        (status = 409, description = "No player has started the song yet")))]
+pub async fn seek(
+    State(state): State<AppState>,
+    _c: Can<need::PlayerControl>,
+    Json(b): Json<SeekBody>,
+) -> AppResult<StatusCode> {
+    let to = match (b.position_ms, b.offset_ms) {
+        (Some(ms), None) => Seek::To(ms),
+        (None, Some(delta)) => Seek::By(delta),
+        _ => return Err(AppError::bad("請給 position_ms 或 offset_ms 其中一個")),
+    };
+    match control::seek(&state, to).await? {
+        Seeked::To(_) => Ok(StatusCode::NO_CONTENT),
+        Seeked::NothingOnAir => Err(AppError::not_found("現在沒有在播的歌")),
+        Seeked::NotStarted => Err(AppError::Conflict(
+            "播放頁還沒開始播這首歌，等它開始再調整進度".into(),
+        )),
     }
 }
 

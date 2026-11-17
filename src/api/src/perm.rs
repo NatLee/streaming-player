@@ -8,7 +8,7 @@ use utoipa::ToSchema;
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, ToSchema,
 )]
 pub enum Perm {
-    /// Play, pause, skip, volume; send player reports.
+    /// Play, pause, skip, seek, volume; send player reports.
     #[serde(rename = "player.control")]
     PlayerControl,
     /// See the queue, the player state and the live updates.
@@ -54,7 +54,7 @@ pub const ALL: &[PermInfo] = &[
     PermInfo {
         perm: Perm::PlayerControl,
         id: "player.control",
-        label: "控制播放（播放、暫停、跳過、音量）",
+        label: "控制播放（播放、暫停、跳過、調整進度、音量）",
     },
     PermInfo {
         perm: Perm::QueueView,

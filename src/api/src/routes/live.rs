@@ -215,6 +215,9 @@ struct Report {
     request_id: i64,
     #[serde(default)]
     position_ms: i64,
+    /// The last seek this player has applied (see `Clock::seek_seq`).
+    #[serde(default)]
+    seek_seq: u32,
     #[serde(default)]
     secs: i64,
     #[serde(default)]
@@ -229,11 +232,12 @@ async fn handle_report(state: &AppState, text: &str, grants: &[Perm]) -> anyhow:
     }
     match r.kind.as_str() {
         "started" | "progress" => {
-            let synced = state
-                .player
-                .lock()
-                .unwrap()
-                .sync(r.request_id, r.position_ms, now_ms());
+            let synced = state.player.lock().unwrap().sync(
+                r.request_id,
+                r.seek_seq,
+                r.position_ms,
+                now_ms(),
+            );
             if synced {
                 if r.kind == "started" {
                     queue::mark_started(state, r.request_id).await?;
