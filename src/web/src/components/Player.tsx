@@ -19,6 +19,10 @@ interface Common {
   startMs: number;
   /** Where the shared clock says we should be now (followers only). */
   expectedMs: () => number | null;
+  /** Where the shared clock says the song is now, for every player. */
+  clockMs: () => number;
+  /** The shared clock's seek number (see `useSeekSync`). */
+  seekSeq: number;
   /** Changes every time a new state arrives. */
   syncTick: number;
   paused: boolean;
@@ -63,13 +67,19 @@ export function Player({ live, mediaKey, report = false, forceMuted = false, idl
     [report],
   );
 
-  const expectedMs = useCallback(() => {
+  const clockMs = useCallback(() => {
     const l = liveRef.current;
     const n = l.state?.now;
-    if (!n || !n.clock_started || l.leader) return null;
-    const running = !l.state?.player.paused;
+    if (!n) return 0;
+    const running = n.clock_started && !l.state?.player.paused;
     return n.elapsed_ms + (running ? performance.now() - l.receivedAt : 0);
   }, []);
+
+  const expectedMs = useCallback(() => {
+    const l = liveRef.current;
+    if (!l.state?.now?.clock_started || l.leader) return null;
+    return clockMs();
+  }, [clockMs]);
 
   if (!now || !playback || !player) return <>{idle}</>;
 
@@ -78,6 +88,8 @@ export function Player({ live, mediaKey, report = false, forceMuted = false, idl
     entry: now,
     startMs,
     expectedMs,
+    clockMs,
+    seekSeq: now.seek_seq,
     syncTick: live.receivedAt,
     paused: player.paused,
     volume: player.volume,
@@ -136,12 +148,38 @@ function useAutoplayWatch(entryId: number, paused: boolean) {
   return { blocked, setBlocked, markPlaying, playing };
 }
 
+/**
+ * Someone moved the song (seek bar, back/forward buttons): when the shared clock's seek
+ * number changes, jump to where the clock is. Every player does this, the leader too.
+ *
+ * `seekTo` returns false while the media can't seek yet; call `catchUp` again once it can.
+ * `applied` goes back with every report, so the server drops reports from before the jump.
+ */
+function useSeekSync(seekSeq: number, clockMs: () => number, seekTo: (ms: number) => boolean) {
+  // The start position already includes every seek made before this player opened.
+  const applied = useRef(seekSeq);
+  const latest = useRef({ seekSeq, clockMs, seekTo });
+  latest.current = { seekSeq, clockMs, seekTo };
+  const catchUp = useCallback(() => {
+    const l = latest.current;
+    if (applied.current !== l.seekSeq && l.seekTo(l.clockMs())) applied.current = l.seekSeq;
+  }, []);
+  useEffect(catchUp, [seekSeq, catchUp]);
+  return { applied, catchUp };
+}
+
 function YouTubePlayer(props: Common & { onEmbedError: (code: number) => void }) {
-  const { entry, startMs, expectedMs, syncTick, paused, volume, muted, emit, onEmbedError } = props;
+  const { entry, startMs, expectedMs, clockMs, seekSeq, syncTick, paused, volume, muted, emit, onEmbedError } = props;
   const host = useRef<HTMLDivElement>(null);
   const yt = useRef<YTPlayer | null>(null);
   const started = useRef(false);
   const watch = useAutoplayWatch(entry.id, paused);
+  const seek = useSeekSync(seekSeq, clockMs, (ms) => {
+    const p = yt.current;
+    if (!p) return false;
+    p.seekTo(ms / 1000, true);
+    return true;
+  });
   const latest = useRef({ paused, volume, muted, onEmbedError });
   latest.current = { paused, volume, muted, onEmbedError };
 
@@ -176,6 +214,7 @@ function YouTubePlayer(props: Common & { onEmbedError: (code: number) => void })
               e.target.setVolume(l.volume);
               if (l.muted) e.target.mute();
               else e.target.unMute();
+              seek.catchUp();
               if (!l.paused) e.target.playVideo();
             },
             onStateChange: (e) => {
@@ -183,7 +222,10 @@ function YouTubePlayer(props: Common & { onEmbedError: (code: number) => void })
                 watch.markPlaying();
                 if (!started.current) {
                   started.current = true;
-                  emit("started", { position_ms: Math.round(e.target.getCurrentTime() * 1000) });
+                  emit("started", {
+                    position_ms: Math.round(e.target.getCurrentTime() * 1000),
+                    seek_seq: seek.applied.current,
+                  });
                   const d = e.target.getDuration();
                   if (entry.song.duration_secs == null && d > 0) {
                     emit("duration", { secs: Math.round(d) });
@@ -225,7 +267,7 @@ function YouTubePlayer(props: Common & { onEmbedError: (code: number) => void })
     const t = window.setInterval(() => {
       const p = yt.current;
       if (p && p.getPlayerState() === YT_STATE.PLAYING) {
-        emit("progress", { position_ms: Math.round(p.getCurrentTime() * 1000) });
+        emit("progress", { position_ms: Math.round(p.getCurrentTime() * 1000), seek_seq: seek.applied.current });
       }
     }, PROGRESS_EVERY_MS);
     return () => window.clearInterval(t);
@@ -261,13 +303,19 @@ interface PlaySource {
 }
 
 function StreamPlayer(props: Common & { mediaKey?: string | null }) {
-  const { entry, startMs, expectedMs, syncTick, paused, volume, muted, emit, mediaKey } = props;
+  const { entry, startMs, expectedMs, clockMs, seekSeq, syncTick, paused, volume, muted, emit, mediaKey } = props;
   const video = useRef<HTMLVideoElement>(null);
   const started = useRef(false);
   const failed = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [audioOnly, setAudioOnly] = useState(false);
   const watch = useAutoplayWatch(entry.id, paused);
+  const seek = useSeekSync(seekSeq, clockMs, (ms) => {
+    const v = video.current;
+    if (!v || v.readyState < 1) return false;
+    v.currentTime = ms / 1000;
+    return true;
+  });
 
   const fail = useCallback(
     (reason: string) => {
@@ -329,7 +377,9 @@ function StreamPlayer(props: Common & { mediaKey?: string | null }) {
   useEffect(() => {
     const t = window.setInterval(() => {
       const v = video.current;
-      if (v && !v.paused && !v.ended) emit("progress", { position_ms: Math.round(v.currentTime * 1000) });
+      if (v && !v.paused && !v.ended) {
+        emit("progress", { position_ms: Math.round(v.currentTime * 1000), seek_seq: seek.applied.current });
+      }
     }, PROGRESS_EVERY_MS);
     return () => window.clearInterval(t);
   }, [emit]);
@@ -351,6 +401,7 @@ function StreamPlayer(props: Common & { mediaKey?: string | null }) {
         onLoadedMetadata={(e) => {
           const v = e.currentTarget;
           if (startMs > 1000) v.currentTime = startMs / 1000;
+          seek.catchUp();
           v.volume = Math.min(1, Math.max(0, volume / 100));
           v.muted = muted;
           if (entry.song.duration_secs == null && Number.isFinite(v.duration) && v.duration > 0) {
@@ -362,7 +413,10 @@ function StreamPlayer(props: Common & { mediaKey?: string | null }) {
           watch.markPlaying();
           if (!started.current) {
             started.current = true;
-            emit("started", { position_ms: Math.round(e.currentTarget.currentTime * 1000) });
+            emit("started", {
+              position_ms: Math.round(e.currentTarget.currentTime * 1000),
+              seek_seq: seek.applied.current,
+            });
           }
         }}
         onEnded={() => emit("ended")}
