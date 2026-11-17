@@ -120,7 +120,7 @@ sequenceDiagram
   S->>S: permission and cooldown
   S->>Site: title and length (skipped if the song is known)
   S->>S: queue rules: open, blocked, too long, duplicate, limits
-  S-->>Chat: 「播放順位是#3，還要再等4分30秒」
+  S-->>Chat: 「播放順位是#35;3，還要再等4分30秒」
   S-->>OBS: state (queue changed)
   S-->>Ov: notice「Viewer 點了『…』」
   Note over OBS: when the song before it ends

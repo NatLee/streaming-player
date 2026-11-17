@@ -48,10 +48,10 @@ sequenceDiagram
   participant F as Player B (follower)
   S->>L: hello {leader: true}
   S->>F: hello {leader: false}
-  S-->>L: state {now: #12, clock_started: false}
-  S-->>F: state {now: #12, clock_started: false}
+  S-->>L: state {now: #35;12, clock_started: false}
+  S-->>F: state {now: #35;12, clock_started: false}
   L->>S: started {request_id: 12, position_ms: 0}
-  S-->>F: state {now: #12, elapsed_ms: 0, clock_started: true}
+  S-->>F: state {now: #35;12, elapsed_ms: 0, clock_started: true}
   loop every 5 s
     L->>S: progress {request_id: 12, position_ms}
     S-->>F: state {elapsed_ms}
@@ -64,8 +64,8 @@ sequenceDiagram
   L->>S: progress {position_ms, seek_seq: 1}
   L->>S: ended {request_id: 12}
   F--xS: ended (ignored: not the leader)
-  S-->>L: state {now: #13}
-  S-->>F: state {now: #13}
+  S-->>L: state {now: #35;13}
+  S-->>F: state {now: #35;13}
 ```
 
 - The oldest connected player page leads. Only its reports move the queue, and every report names the request, so a late or repeated `ended` changes nothing.
