@@ -34,6 +34,7 @@ export function nowPlaying(over: Partial<NowPlaying> = {}): NowPlaying {
     ended_at: null,
     elapsed_ms: 50_000,
     clock_started: true,
+    seek_seq: 0,
     song: song(),
     ...over,
   };

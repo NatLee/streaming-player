@@ -40,6 +40,8 @@ Every open player page (OBS on the stream PC, a laptop, a phone) shows the same 
 
 Pause, resume, skip and volume on the admin page (or from chat moderators) reach every player page at once.
 
+To move within a song, drag the progress bar on the dashboard (or focus it and use the arrow keys), or press the 5-second back and forward buttons beside pause. The server moves its clock and every player page jumps there, the leader included; this also works while paused. The bar becomes draggable once a player page has started the song and its length is known.
+
 ## Volume
 
 There are two volume controls on purpose:

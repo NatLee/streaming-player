@@ -5,6 +5,8 @@ import {
   ListPlus,
   Pause,
   Play,
+  RotateCcw,
+  RotateCw,
   SkipForward,
   Star,
   Trash2,
@@ -23,6 +25,9 @@ import { ConfirmButton, ErrorBox, Loading, Notice, PageHeader } from "../compone
 import { ago } from "../lib/format";
 import { useElapsed, useLive } from "../lib/live";
 import type { ActivityEvent, Enqueued, Placement, Settings } from "../types";
+
+/** How far the back and forward buttons move the song. */
+const SEEK_STEP_SECS = 5;
 
 const PLACEMENTS: { value: Placement; label: string }[] = [
   { value: "end", label: "排到最後" },
@@ -95,6 +100,9 @@ export function Dashboard() {
       : undefined,
   };
   const control = can("player.control");
+  // Seeking needs a position: a player page has to have started the song.
+  const seekable = control && Boolean(now?.clock_started);
+  const seekBy = (secs: number) => run(() => post("/api/player/seek", { offset_ms: secs * 1000 }));
 
   const toggleRequests = () =>
     run(async () => {
@@ -134,9 +142,25 @@ export function Dashboard() {
       )}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
-          <NowPlayingCard now={now} elapsedMs={elapsed} next={state.queue[0]} paused={state.player.paused} size="lg" />
+          <NowPlayingCard
+            now={now}
+            elapsedMs={elapsed}
+            next={state.queue[0]}
+            paused={state.player.paused}
+            size="lg"
+            onSeek={control ? (ms) => run(() => post("/api/player/seek", { position_ms: Math.round(ms) })) : undefined}
+          />
           {control && (
           <div className="card flex flex-wrap items-center gap-2 p-3">
+            <button
+              className="btn btn-secondary"
+              disabled={!seekable}
+              title={`倒退 ${SEEK_STEP_SECS} 秒`}
+              aria-label={`倒退 ${SEEK_STEP_SECS} 秒`}
+              onClick={() => seekBy(-SEEK_STEP_SECS)}
+            >
+              <RotateCcw className="size-4" /> {SEEK_STEP_SECS} 秒
+            </button>
             {state.player.paused ? (
               <button className="btn btn-primary" onClick={() => run(() => post("/api/player/resume"))}>
                 <Play className="size-4" /> 播放
@@ -146,6 +170,15 @@ export function Dashboard() {
                 <Pause className="size-4" /> 暫停
               </button>
             )}
+            <button
+              className="btn btn-secondary"
+              disabled={!seekable}
+              title={`快轉 ${SEEK_STEP_SECS} 秒`}
+              aria-label={`快轉 ${SEEK_STEP_SECS} 秒`}
+              onClick={() => seekBy(SEEK_STEP_SECS)}
+            >
+              <RotateCw className="size-4" /> {SEEK_STEP_SECS} 秒
+            </button>
             <button className="btn btn-secondary" disabled={!now} onClick={() => run(() => post("/api/player/skip", { block: false }))}>
               <SkipForward className="size-4" /> 跳過
             </button>

@@ -25,7 +25,7 @@ Streaming Player is a self-hosted song request player for live streams. Viewers 
 - **Requests from anywhere.** Twitch chat (EventSub, replies in chat), YouTube live chat (Live Chat API with an API key), and a plain HTTP API for chat bots. All of them go through one table of commands whose words, permissions, cooldowns and reply texts you edit on the admin page.
 - **A queue with rules.** Queue size, songs per person, maximum length, duplicates, vote-to-skip and vote-to-bump thresholds, a block list for people and for songs. Moderators can bypass the limits. When the queue is empty, the default playlist (your starred songs) keeps the music going.
 - **Made for OBS.** A player page and a transparent "now playing" overlay, each one browser source. Every open player page stays in sync over WebSocket, and only one of them moves the queue on.
-- **Control while live.** Play, pause, skip, skip and block, volume, reorder, play next, interrupt, remove, block the requester, all from the dashboard or from chat for moderators.
+- **Control while live.** Play, pause, skip, skip and block, drag the progress bar or jump 5 seconds back and forward, volume, reorder, play next, interrupt, remove, block the requester, all from the dashboard or from chat for moderators.
 - **For viewers.** A public queue page (`/queue`) where anyone can look up their own requests, and (if you allow it) sign-up at `/register` to request from the web.
 - **Accounts with permissions.** Roles are sets of permission points (control the player, manage the queue, the library, the block list, commands, settings, users). Admin, moderator and viewer are built in; make your own. Programs sign in with access tokens or personal API tokens.
 - **Backups.** Settings, commands and the block list export to one JSON file; the song library to CSV or JSON.
@@ -120,7 +120,7 @@ sequenceDiagram
   S->>S: permission and cooldown
   S->>Site: title and length (skipped if the song is known)
   S->>S: queue rules: open, blocked, too long, duplicate, limits
-  S-->>Chat: 「播放順位是#3，還要再等4分30秒」
+  S-->>Chat: 「播放順位是#35;3，還要再等4分30秒」
   S-->>OBS: state (queue changed)
   S-->>Ov: notice「Viewer 點了『…』」
   Note over OBS: when the song before it ends
@@ -135,7 +135,7 @@ More in [how it works](docs/architecture.md): the playback sync, the media paths
 
 | Admin dashboard (`/admin`) | Viewer page (`/queue`) |
 |---|---|
-| <img src="https://raw.githubusercontent.com/NatLee/streaming-player/main/docs/images/admin-dashboard.png" alt="Admin dashboard: the song on air with play, pause, skip, skip-and-block, default-playlist and volume controls; the request box; the queue with move, play next, interrupt, favorite, copy, remove and block buttons; the activity log"> | <img src="https://raw.githubusercontent.com/NatLee/streaming-player/main/docs/images/viewer.png" alt="Viewer page: now playing, a box to look up your own requests (Mika's waiting and past songs), and the queue with positions and waiting times"> |
+| <img src="https://raw.githubusercontent.com/NatLee/streaming-player/main/docs/images/admin-dashboard.png" alt="Admin dashboard: the song on air with a draggable progress bar; back 5 s, pause, forward 5 s, skip, skip-and-block, default-playlist and volume controls; the request box; the queue with move, play next, interrupt, favorite, copy, remove and block buttons; the activity log"> | <img src="https://raw.githubusercontent.com/NatLee/streaming-player/main/docs/images/viewer.png" alt="Viewer page: now playing, a box to look up your own requests (Mika's waiting and past songs), and the queue with positions and waiting times"> |
 
 The admin pages also cover the song library (default playlist, block list, songs that went missing, CSV/JSON import and export), request history with per-person statistics, the chat commands, the chat connections, settings and users. The HTTP API is in Swagger UI at `/api/docs/`.
 
@@ -196,7 +196,7 @@ Everyone who signs in has a role, and a role is a set of permission points:
 
 | Permission | Lets you |
 |---|---|
-| `player.control` | play, pause, skip, volume (and be an OBS player page with your session) |
+| `player.control` | play, pause, skip, seek, volume (and be an OBS player page with your session) |
 | `queue.view` / `queue.request` | watch the queue / request songs from the web page, under the queue rules |
 | `queue.manage` | reorder, play next, interrupt, remove, add songs without the limits |
 | `library.manage`, `blocklist.manage`, `history.view` | the song library and default playlist, the block list, history and the activity log |
@@ -219,6 +219,9 @@ curl -s -H 'content-type: application/json' -d '{"username":"natlee","password":
 # {"access_token":"eyJ…","refresh_token":"8f3…","token_type":"Bearer","expires_in":900,"refresh_expires_in":2592000}
 
 curl -s -X POST -H "Authorization: Bearer eyJ…" http://localhost:7878/api/player/skip
+# Jump 5 s ahead (or {"position_ms": 90000} to go to 1:30)
+curl -s -X POST -H "Authorization: Bearer eyJ…" -H 'content-type: application/json' \
+  -d '{"offset_ms": 5000}' http://localhost:7878/api/player/seek
 ```
 
 `/api/auth/refresh` trades a refresh token for a new pair (the old one stops working) and `/api/auth/revoke` cancels one. Changing your password or being disabled signs out every session and token. For a Stream Deck or Streamer.bot button, make a **personal API token** (`spat_…`) on **我的帳號**: it never expires unless you say so, and it can only do what you ticked. Details: [users and permissions](docs/users-and-permissions.md).

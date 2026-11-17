@@ -38,6 +38,8 @@ export interface Entry {
 export interface NowPlaying extends Entry {
   elapsed_ms: number;
   clock_started: boolean;
+  /** Goes up by one on every seek; players jump to `elapsed_ms` when it changes. */
+  seek_seq: number;
 }
 
 export interface QueueItem extends Entry {

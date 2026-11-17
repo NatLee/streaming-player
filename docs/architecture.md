@@ -48,24 +48,30 @@ sequenceDiagram
   participant F as Player B (follower)
   S->>L: hello {leader: true}
   S->>F: hello {leader: false}
-  S-->>L: state {now: #12, clock_started: false}
-  S-->>F: state {now: #12, clock_started: false}
+  S-->>L: state {now: #35;12, clock_started: false}
+  S-->>F: state {now: #35;12, clock_started: false}
   L->>S: started {request_id: 12, position_ms: 0}
-  S-->>F: state {now: #12, elapsed_ms: 0, clock_started: true}
+  S-->>F: state {now: #35;12, elapsed_ms: 0, clock_started: true}
   loop every 5 s
     L->>S: progress {request_id: 12, position_ms}
     S-->>F: state {elapsed_ms}
     Note over F: seek if more than 3 s off
   end
+  Note over S: admin seeks (+5 s or the bar): clock moves, seek_seq 0 → 1
+  S-->>L: state {elapsed_ms, seek_seq: 1}
+  S-->>F: state {elapsed_ms, seek_seq: 1}
+  Note over L,F: both jump to elapsed_ms
+  L->>S: progress {position_ms, seek_seq: 1}
   L->>S: ended {request_id: 12}
   F--xS: ended (ignored: not the leader)
-  S-->>L: state {now: #13}
-  S-->>F: state {now: #13}
+  S-->>L: state {now: #35;13}
+  S-->>F: state {now: #35;13}
 ```
 
 - The oldest connected player page leads. Only its reports move the queue, and every report names the request, so a late or repeated `ended` changes nothing.
 - The server's clock (`player.rs`) stores where the leader was and when, so a page that joins mid-song starts at the right spot.
 - Pause, resume, skip and volume change the shared state, and every page follows.
+- A seek (`POST /api/player/seek`, a position or an offset) moves the server's clock and raises `seek_seq`. Every player page, the leader too, jumps when `seek_seq` changes, and sends the number it has applied with its reports. The server drops reports with an older number, so a progress report written just before the jump can't pull the clock back.
 - An error report (or an embed error with the fallback off) counts a failure for the song. After `missing_after_failures` failures in a row, the song is marked missing (v1 issue #2).
 - Songs whose length the site didn't tell are measured by the player; if they turn out longer than the limit, they are skipped.
 

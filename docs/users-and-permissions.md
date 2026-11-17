@@ -6,7 +6,7 @@ Everyone who signs in to the web page has one **role**. A role is a set of **per
 
 | Id | Lets you |
 |---|---|
-| `player.control` | Play, pause, skip, volume. Open `/obs/player` with your session (it reports when songs end). |
+| `player.control` | Play, pause, skip, seek, volume. Open `/obs/player` with your session (it reports when songs end). |
 | `queue.view` | See the queue, the player state and the live updates (dashboard, overlay). |
 | `queue.request` | Request songs from the web page. The queue rules apply, as for chat. |
 | `queue.manage` | Reorder, play next, interrupt, remove, clear; add songs without the limits, at any place. |

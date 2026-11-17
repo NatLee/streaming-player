@@ -58,6 +58,7 @@ export function Watch() {
       ended_at: null,
       elapsed_ms: 0,
       clock_started: false,
+      seek_seq: 0,
       song: {
         id: 0,
         kind: "youtube",

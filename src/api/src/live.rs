@@ -110,6 +110,9 @@ pub struct NowPlaying {
     pub elapsed_ms: i64,
     /// False until a player reported that the video really started.
     pub clock_started: bool,
+    /// Goes up by one on every seek; players jump to `elapsed_ms` when it changes and send
+    /// it back with their reports.
+    pub seek_seq: u32,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -137,13 +140,14 @@ pub async fn snapshot(state: &Inner) -> Result<LiveState> {
     let current = queue::current(&state.db).await?;
     let waiting = queue::queued(&state.db).await?;
     let t = now_ms();
-    let (player, elapsed, started) = {
+    let (player, elapsed, started, seek_seq) = {
         let p = state.player.lock().unwrap();
         let matches = current.as_ref().map(|c| c.id) == p.clock.request_id;
         (
             p.view(),
             if matches { p.elapsed_ms(t) } else { 0 },
             matches && p.clock.started,
+            if matches { p.clock.seek_seq } else { 0 },
         )
     };
     let settings = state.settings();
@@ -153,6 +157,7 @@ pub async fn snapshot(state: &Inner) -> Result<LiveState> {
             entry,
             elapsed_ms: elapsed,
             clock_started: started,
+            seek_seq,
         }),
         queue: lineup,
         player,
